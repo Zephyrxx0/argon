@@ -7,3 +7,9 @@ export * from './coupling/types.js';
 export * from './coupling/filter.js';
 export * from './coupling/components.js';
 export * from './coupling/cochange.js';
+
+export * from './mining/types.js';
+export * from './mining/adr.js';
+export * from './mining/reverts.js';
+export * from './mining/commits.js';
+export * from './mining/embed.js';
