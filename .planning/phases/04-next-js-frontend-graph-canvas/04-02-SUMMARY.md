@@ -63,3 +63,4 @@ Proceed to Plan **`04-03-PLAN.md`**:
 - 2077 Brutalist Evidence Cards for decisions, files, components, and people (`D-02`, `D-07`).
 - Brutalist Kill-Switch Hero Card for citation failures / 503 (`D-04`).
 - Next.js Server Route Handler `POST /api/briefing` calling `@argon/agent` (`D-12`).
+

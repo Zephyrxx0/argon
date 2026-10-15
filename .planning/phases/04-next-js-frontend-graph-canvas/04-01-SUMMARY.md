@@ -61,3 +61,4 @@
 Proceed to Wave 2:
 - **`04-02-PLAN.md`:** Command Bar (`Cmd+K` palette), Workspace Switcher, Ingest Modal, and Contributor Picker.
 - **`04-03-PLAN.md`:** Briefing View, Evidence Cards, Kill-Switch Hero Card, and `/api/briefing` Route.
+

@@ -37,3 +37,4 @@ describe('Traversal Marching Animator', () => {
     expect(() => handle.stop()).not.toThrow();
   });
 });
+

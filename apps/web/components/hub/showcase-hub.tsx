@@ -147,3 +147,4 @@ export function ShowcaseHub({ onSelectScenario, className }: ShowcaseHubProps) {
     </div>
   );
 }
+

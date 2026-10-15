@@ -50,3 +50,4 @@ describe('Cytoscape Stylesheet', () => {
     expect(dimmedRule?.style['opacity']).toBe(0.2);
   });
 });
+

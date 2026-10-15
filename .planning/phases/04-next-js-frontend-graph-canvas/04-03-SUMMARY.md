@@ -69,3 +69,4 @@
 
 Proceed to Wave 3:
 - **`04-04-PLAN.md`:** Cytoscape Canvas, dynamic `fcose` physics layout, 2077 stylesheet, bidirectional card-to-graph highlighting, animated traversal march, and floating Cyber HUD controls.
+

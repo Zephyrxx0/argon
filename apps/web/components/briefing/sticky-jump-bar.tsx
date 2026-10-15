@@ -82,3 +82,4 @@ export function StickyJumpBar({ counts = {}, className }: StickyJumpBarProps) {
     </div>
   );
 }
+

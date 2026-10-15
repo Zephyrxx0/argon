@@ -12,20 +12,19 @@ Every briefing claim is mathematically grounded in and computed by the FalkorDB 
 
 ### Validated
 
-(None yet — ship to validate)
+- [x] **GRAPH-01**: FalkorDB graph schema, constraints, vector index, and 8 parameterized named queries executed exclusively via `GRAPH.RO_QUERY`. — *Phase 01*
+- [x] **EMB-01**: Embedding generation using EmbeddingGemma-2 (`q8`, 512-d) on Node.js CPU via Transformers.js with L2-normalized MRL truncation. — *Phase 01*
+- [x] **ING-01**: Tier 0 ingestion extracting commits, authors, file touches, co-change coupling, and `REVERTS` relationships. — *Phase 02*
+- [x] **DEC-01**: Structured decision extraction from markdown ADRs/RFCs and commit messages with supersession windows (`valid_from`, `valid_to`). — *Phase 02*
+- [x] **JOB-01**: Pure FalkorDB `IngestJob` node state tracking and background worker polling without external queue dependencies. — *Phase 02*
+- [x] **GW-01**: Cloud Run read-only query gateway with Direct VPC egress to FalkorDB on Compute Engine (ports closed to public). — *Phase 03*
+- [x] **BRIEF-01**: Parallel query retrieval pipeline followed by single-call Gemma 4 narration with strict Zod schema validation and retry loop. — *Phase 03*
+- [x] **CITE-01**: Strict citation integrity post-check verifying all cited node IDs against FalkorDB before presenting to the user. — *Phase 03*
+- [x] **WS-01**: Guest-first workspaces supporting arbitrary git repositories without mandatory login. — *Phase 04*
+- [x] **UI-01**: Command bar interface, brutalist evidence cards (2077 tweakcn theme), and Cytoscape.js traversal canvas (in-memory layout). — *Phase 04*
 
 ### Active
 
-- [ ] **WS-01**: Guest-first workspaces supporting arbitrary git repositories without mandatory login.
-- [ ] **ING-01**: Tier 0 ingestion extracting commits, authors, file touches, co-change coupling, and `REVERTS` relationships.
-- [ ] **DEC-01**: Structured decision extraction from markdown ADRs/RFCs and commit messages with supersession windows (`valid_from`, `valid_to`).
-- [ ] **EMB-01**: Embedding generation using EmbeddingGemma-2 (`q8`, 512-d) on Node.js CPU via Transformers.js with L2-normalized MRL truncation.
-- [ ] **GRAPH-01**: FalkorDB graph schema, constraints, vector index, and 8 parameterized named queries executed exclusively via `GRAPH.RO_QUERY`.
-- [ ] **JOB-01**: Pure FalkorDB `IngestJob` node state tracking and background worker polling without external queue dependencies.
-- [ ] **GW-01**: Cloud Run read-only query gateway with Direct VPC egress to FalkorDB on Compute Engine (ports closed to public).
-- [ ] **BRIEF-01**: Parallel query retrieval pipeline followed by single-call Gemma 4 narration with strict Zod schema validation and retry loop.
-- [ ] **CITE-01**: Strict citation integrity post-check verifying all cited node IDs against FalkorDB before presenting to the user.
-- [ ] **UI-01**: Command bar interface, brutalist evidence cards (2077 tweakcn theme), and Cytoscape.js traversal canvas (in-memory layout).
 - [ ] **EVAL-01**: Historical revert backtest runner with `asOf` date rewinding and no-graph baseline comparison.
 
 ### Out of Scope
@@ -83,5 +82,5 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-15 after initialization*
+*Last updated: 2026-10-15 after Phase 04*
 

@@ -76,3 +76,4 @@ describe('CommandDialog Component', () => {
     expect(onOpenChangeMock).toHaveBeenCalledWith(false);
   });
 });
+
