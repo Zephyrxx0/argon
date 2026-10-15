@@ -28,5 +28,43 @@ if (typeof window !== 'undefined') {
   if (typeof window.HTMLElement !== 'undefined') {
     window.HTMLElement.prototype.scrollIntoView = function () {};
   }
+
+  // Mock HTMLCanvasElement.prototype.getContext for Cytoscape in JSDOM
+  if (typeof window.HTMLCanvasElement !== 'undefined') {
+    window.HTMLCanvasElement.prototype.getContext = function (contextType: string) {
+      if (contextType === '2d') {
+        return {
+          fillRect: () => {},
+          clearRect: () => {},
+          getImageData: (_x: number, _y: number, w: number, h: number) => ({
+            data: new Array(w * h * 4),
+          }),
+          putImageData: () => {},
+          createImageData: () => [],
+          setTransform: () => {},
+          drawImage: () => {},
+          save: () => {},
+          fillText: () => {},
+          restore: () => {},
+          beginPath: () => {},
+          moveTo: () => {},
+          lineTo: () => {},
+          closePath: () => {},
+          stroke: () => {},
+          translate: () => {},
+          scale: () => {},
+          rotate: () => {},
+          arc: () => {},
+          arcTo: () => {},
+          fill: () => {},
+          measureText: (text: string) => ({ width: text.length * 8 }),
+          transform: () => {},
+          rect: () => {},
+          clip: () => {},
+        } as any;
+      }
+      return null;
+    } as any;
+  }
 }
 

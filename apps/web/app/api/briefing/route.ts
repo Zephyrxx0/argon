@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { ArgonGraphClient } from '@argon/graph';
-import {
-  HttpGatewayClient,
-  DirectGraphGatewayClient,
-  runBriefingPipeline,
-  type GatewayClient,
-} from '@argon/agent';
+import type { GatewayClient } from '@argon/agent';
 
-export const BriefingRequestSchema = z.object({
+export const dynamic = 'force-dynamic';
+
+const BriefingRequestSchema = z.object({
   task: z.string().min(1, 'Task description cannot be empty'),
   workspaceId: z
     .string()
@@ -41,6 +37,11 @@ export async function POST(req: NextRequest) {
 
     const { task, workspaceId, files, components, contributorId, asOf, anonymousSessionId } =
       parseResult.data;
+
+    const { ArgonGraphClient } = await import('@argon/graph');
+    const { HttpGatewayClient, DirectGraphGatewayClient, runBriefingPipeline } = await import(
+      '@argon/agent'
+    );
 
     const graphClient = new ArgonGraphClient();
 

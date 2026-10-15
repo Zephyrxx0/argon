@@ -1,13 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { SplitViewport } from '@/components/layout/split-viewport';
 import { ShowcaseHub } from '@/components/hub/showcase-hub';
 import { BriefingView, type WebBriefingResponse } from '@/components/briefing/briefing-view';
 import { HeaderBar } from '@/components/navigation/header-bar';
 import { GraphSyncProvider } from '@/lib/graph-sync';
+import { CytoscapeCanvas, DEFAULT_SHOWCASE_GRAPH } from '@/components/canvas/cytoscape-canvas';
+import { HudControls } from '@/components/canvas/hud-controls';
 import { type Workspace } from '@/components/workspace/workspace-switcher';
-import { Network, Cpu, Database } from 'lucide-react';
+import type { Core } from 'cytoscape';
+import type { CytoscapeElements } from '@argon/graph';
 
 export default function HomePage() {
   const [selectedTask, setSelectedTask] = useState<string>('');
@@ -16,6 +19,8 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [briefingResponse, setBriefingResponse] = useState<WebBriefingResponse | null>(null);
+
+  const cyRef = useRef<Core | null>(null);
 
   const executeBriefing = async (task: string) => {
     setSelectedTask(task);
@@ -48,7 +53,7 @@ export default function HomePage() {
       } else {
         setBriefingResponse(data);
       }
-    } catch (err: any) {
+    } catch {
       setBriefingResponse({
         status: 'FALKORDB_TIMEOUT',
         reason: 'FalkorDB Graph Unreachable (503): Network or database egress failed.',
@@ -77,6 +82,111 @@ export default function HomePage() {
       executeBriefing(selectedTask);
     }
   };
+
+  // Dynamically compute Cytoscape elements from active briefing evidence (Decision D-13 & D-16)
+  const canvasElements = useMemo<CytoscapeElements>(() => {
+    const briefing = briefingResponse?.briefing;
+    if (!briefing) return DEFAULT_SHOWCASE_GRAPH;
+
+    const nodes: CytoscapeElements['nodes'] = [];
+    const edges: CytoscapeElements['edges'] = [];
+
+    // 1. Add Affected Components
+    briefing.blastRadius.affectedComponents.forEach((comp) => {
+      const compId = comp.citedNodeIds?.[0] || `c:${comp.component}`;
+      nodes.push({
+        data: {
+          id: compId,
+          label: comp.component,
+          type: 'Component',
+          properties: { reason: comp.reason },
+        },
+      });
+    });
+
+    // 2. Add Key Owners
+    briefing.keyOwners.forEach((owner) => {
+      nodes.push({
+        data: {
+          id: owner.personId,
+          label: owner.name,
+          type: 'Person',
+          properties: { role: owner.role, commits: owner.authoredCount, component: owner.component },
+        },
+      });
+
+      // Edge from owner to component
+      const targetComp = nodes.find((n) => n.data.label === owner.component);
+      if (targetComp) {
+        edges.push({
+          data: {
+            id: `e-owner-${owner.personId}-${targetComp.data.id}`,
+            source: owner.personId,
+            target: targetComp.data.id,
+            label: 'OWNS',
+            properties: {},
+          },
+        });
+      }
+    });
+
+    // 3. Add Constraining Decisions
+    briefing.constrainingDecisions.forEach((dec) => {
+      nodes.push({
+        data: {
+          id: dec.decisionId,
+          label: dec.title,
+          type: 'Decision',
+          properties: { status: dec.status, component: dec.component, constraint: dec.constraint },
+        },
+      });
+
+      // Edge from decision to component
+      const targetComp = nodes.find((n) => n.data.label === dec.component);
+      if (targetComp) {
+        edges.push({
+          data: {
+            id: `e-dec-${dec.decisionId}-${targetComp.data.id}`,
+            source: dec.decisionId,
+            target: targetComp.data.id,
+            label: 'GOVERNS',
+            properties: {},
+          },
+        });
+      }
+    });
+
+    // 4. Add Precedents & Supersession Edges
+    briefing.precedents.forEach((prec) => {
+      nodes.push({
+        data: {
+          id: prec.decisionId,
+          label: prec.title,
+          type: 'Decision',
+          properties: { status: 'superseded', relevance: prec.relevance },
+        },
+      });
+
+      // Link precedent to active decision if available
+      const activeDec = briefing.constrainingDecisions[0];
+      if (activeDec) {
+        edges.push({
+          data: {
+            id: `e-prec-${prec.decisionId}-${activeDec.decisionId}`,
+            source: prec.decisionId,
+            target: activeDec.decisionId,
+            label: 'SUPERSEDED_BY',
+            properties: {},
+          },
+        });
+      }
+    });
+
+    return {
+      nodes: nodes.length > 0 ? nodes : DEFAULT_SHOWCASE_GRAPH.nodes,
+      edges: edges.length > 0 ? edges : DEFAULT_SHOWCASE_GRAPH.edges,
+    };
+  }, [briefingResponse]);
 
   return (
     <GraphSyncProvider>
@@ -111,45 +221,18 @@ export default function HomePage() {
               </div>
             }
             rightPanel={
-              <div className="h-full w-full bg-card/60 flex flex-col items-center justify-center p-6 text-center select-none relative overflow-hidden">
-                {/* Subtle cyber background grid lines */}
-                <div
-                  className="absolute inset-0 pointer-events-none opacity-20"
-                  style={{
-                    backgroundImage:
-                      'linear-gradient(to right, #30363d 1px, transparent 1px), linear-gradient(to bottom, #30363d 1px, transparent 1px)',
-                    backgroundSize: '24px 24px',
-                  }}
+              <div className="h-full w-full relative bg-card overflow-hidden">
+                {/* Interactive Cytoscape Canvas */}
+                <CytoscapeCanvas
+                  elements={canvasElements}
+                  cyRef={cyRef}
+                  className="w-full h-full"
                 />
 
-                <div className="z-10 max-w-md border border-border bg-card p-6 shadow-2xl space-y-4">
-                  <div className="flex items-center justify-center gap-2 text-accent">
-                    <Network className="h-6 w-6 animate-pulse" />
-                    <span className="text-xs font-bold tracking-widest uppercase">
-                      CYTOSCAPE GRAPH CANVAS
-                    </span>
-                  </div>
-
-                  <div className="space-y-1">
-                    <h2 className="text-sm font-bold text-foreground uppercase tracking-wide">
-                      Topological Canvas Standby
-                    </h2>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      Graph canvas connects to FalkorDB GraphBLAS matrix engine. When a briefing query is triggered, multi-hop traversal subgraphs will render here in 60fps physics layout.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 pt-2 text-[11px] text-muted-foreground border-t border-border/80">
-                    <div className="border border-border/50 bg-background/50 p-2 flex items-center gap-1.5 justify-center">
-                      <Database className="w-3.5 h-3.5 text-warning" />
-                      <span>FalkorDB Matrix</span>
-                    </div>
-                    <div className="border border-border/50 bg-background/50 p-2 flex items-center gap-1.5 justify-center">
-                      <Cpu className="w-3.5 h-3.5 text-accent" />
-                      <span>fCoSE Physics</span>
-                    </div>
-                  </div>
-                </div>
+                {/* Floating Cyber HUD Controls */}
+                <HudControls
+                  cy={cyRef.current}
+                />
               </div>
             }
           />
