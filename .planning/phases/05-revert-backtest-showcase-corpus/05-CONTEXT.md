@@ -145,3 +145,4 @@ Out of scope:
 
 *Phase: 05-Revert Backtest & Showcase Corpus*
 *Context gathered: 2026-10-16*
+

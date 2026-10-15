@@ -202,3 +202,4 @@
 ## Deferred Ideas
 
 - None — all decisions stayed strictly within Phase 5 scope.
+
