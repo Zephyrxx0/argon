@@ -77,3 +77,4 @@ The test suite in `apps/web/tests/` provides 100% automated coverage for fronten
 - `cytoscape-style.test.ts`: 2077 node geometry and color selector mapping.
 - `graph-sync.test.ts`: Bidirectional state transitions between cards and canvas.
 - `page-integration.test.tsx`: End-to-end query execution to canvas rendering.
+
