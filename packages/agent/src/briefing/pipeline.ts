@@ -136,3 +136,6 @@ export async function executeBriefingPipeline(
   };
 }
 
+export const runBriefingPipeline = executeBriefingPipeline;
+
+

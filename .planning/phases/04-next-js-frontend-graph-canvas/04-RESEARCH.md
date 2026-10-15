@@ -196,3 +196,4 @@ export async function POST(req: Request) {
    - Verify `KillSwitchCard` renders on error and triggers retry callback.
 3. **Typecheck & Build:**
    - `pnpm --filter web typecheck` and `pnpm --filter web build` must pass without warnings.
+
