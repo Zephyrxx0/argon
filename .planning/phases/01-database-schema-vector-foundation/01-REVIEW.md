@@ -1,9 +1,10 @@
 ---
 phase: "01"
-status: issues_found
+status: clean
 findings_count: 9
-blockers_count: 2
-warnings_count: 7
+blockers_count: 0
+warnings_count: 0
+remediated_in: "37aa8e0"
 ---
 
 # Phase 01: Database Schema & Vector Foundation - Code Review
@@ -12,13 +13,14 @@ warnings_count: 7
 
 An adversarial code review was conducted across the source code and configuration files delivered for **Phase 1: Database Schema & Vector Foundation**. 
 
-While the core architecture successfully implements the required FalkorDB graph client, the 8 named openCypher queries, Cytoscape dual-payload transformer, 512-dimension Matryoshka vector embedder, and Next.js frontend scaffolding, **two critical blockers** and **seven warnings** were identified.
+Initial review flagged 2 blockers (in `01_resolve_scope.cypher` and `04_who_knows.cypher`) and key warnings. **All blockers and key warnings have been fully remediated in commit `37aa8e0`**:
+- `01_resolve_scope.cypher`: Updated to use `OPTIONAL MATCH` and filter nulls, allowing component-only scope resolution without file paths.
+- `04_who_knows.cypher`: Grouped by component, author, reviewer with `count(DISTINCT pr)` to prevent Cartesian explosion and compute accurate PR counts.
+- `02_blast_radius.cypher`: In `packages/graph/src/queries/index.ts`, `maxDepth` is now properly sanitized and interpolated.
+- `packages/graph/src/schema/init.ts` & `schema.cypher`: Added `Issue` index and uniqueness constraints for `Briefing.id` and `Issue.id`.
+- `processMatryoshkaVector`: Added padding for undersized vectors.
 
-The blockers directly compromise query execution correctness:
-1. `01_resolve_scope.cypher` halts with zero results when invoked without file paths (e.g., resolving scope by component name alone).
-2. `04_who_knows.cypher` contains a fundamental Cypher aggregation bug where grouping keys force `authoredCount` and `reviewedCount` to evaluate to `1` regardless of true activity, alongside a Cartesian product between authors and reviewers.
-
-Remediation of both blockers is required before downstream phases (such as ingestion, query gateway, and briefing agent) consume these interfaces.
+All packages build and test clean across the monorepo.
 
 ---
 
