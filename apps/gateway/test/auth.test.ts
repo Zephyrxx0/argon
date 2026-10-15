@@ -147,3 +147,4 @@ describe('Gateway Auth Middleware & Health Route', () => {
     expect(res.status).toBe(200);
   });
 });
+

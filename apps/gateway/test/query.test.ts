@@ -217,3 +217,4 @@ describe('Gateway Query Router', () => {
     expect(body.error).toBe('FalkorDB is unreachable');
   });
 });
+
