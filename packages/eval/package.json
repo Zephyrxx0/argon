@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run test/metrics.test.ts test/fixtures.test.ts",
-    "bench:graph": "tsx src/cli.ts bench:graph"
+    "bench:graph": "tsx src/cli.ts bench:graph",
+    "seed": "tsx src/cli.ts seed"
   },
   "dependencies": {
     "@argon/agent": "workspace:*",

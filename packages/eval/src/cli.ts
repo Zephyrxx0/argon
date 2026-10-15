@@ -8,6 +8,7 @@ import Table from 'cli-table3';
 import { ArgonGraphClient } from '@argon/graph';
 import { DirectGraphGatewayClient } from '@argon/agent';
 import { runGraphBacktest } from './runner/graph-runner.js';
+import { seedAllShowcaseWorkspaces } from './seed.js';
 import { RevertFixtureItemSchema, type RevertFixtureItem } from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -96,6 +97,54 @@ program
 
       console.log(table.toString());
       console.log(picocolors.green('\nTemporal graph backtest completed successfully.\n'));
+    } finally {
+      await client.close();
+    }
+  });
+
+program
+  .command('seed')
+  .description('Seed all curated showcase workspaces into FalkorDB')
+  .option('-d, --dir <path>', 'Custom seeds directory')
+  .action(async (options: { dir?: string }) => {
+    console.log(picocolors.cyan('\n=== ARGON SHOWCASE CORPUS SEEDER ===\n'));
+
+    const client = new ArgonGraphClient();
+    try {
+      await client.connect();
+      const isLive = await client.ping();
+      if (!isLive) {
+        throw new Error('FalkorDB ping returned false');
+      }
+    } catch (err: any) {
+      console.error(picocolors.red(`\nFailed to connect to FalkorDB: ${err?.message ?? err}`));
+      console.error(picocolors.yellow('Ensure FalkorDB is running (e.g. docker compose up -d)\n'));
+      process.exit(1);
+    }
+
+    const startTime = Date.now();
+    try {
+      const summary = await seedAllShowcaseWorkspaces(client, options.dir);
+      const totalTime = ((Date.now() - startTime) / 1000).toFixed(2);
+
+      const table = new Table({
+        head: [
+          picocolors.cyan('Workspace'),
+          picocolors.green('Nodes Seeded'),
+          picocolors.yellow('Status'),
+        ],
+        style: { head: [], border: [] },
+      });
+
+      for (const [ws, count] of Object.entries(summary)) {
+        table.push([ws, String(count), picocolors.green('SUCCESS')]);
+      }
+
+      console.log(table.toString());
+      console.log(picocolors.green(`\nShowcase seeding finished in ${totalTime}s.\n`));
+    } catch (err: any) {
+      console.error(picocolors.red(`\nSeeding failed: ${err?.message ?? err}`));
+      process.exit(1);
     } finally {
       await client.close();
     }

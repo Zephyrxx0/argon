@@ -11,7 +11,8 @@
     "typecheck": "turbo typecheck",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
-    "db:healthcheck": "docker compose ps --filter health=healthy --format json | grep -q argon-falkordb && echo 'FalkorDB is healthy' || (docker compose ps && exit 1)"
+    "db:healthcheck": "docker compose ps --filter health=healthy --format json | grep -q argon-falkordb && echo 'FalkorDB is healthy' || (docker compose ps && exit 1)",
+    "seed:showcase": "pnpm --filter @argon/eval seed"
   },
   "devDependencies": {
     "turbo": "^2.4.4",
