@@ -1,0 +1,21 @@
+services:
+  falkordb:
+    image: falkordb/falkordb:latest
+    container_name: argon-falkordb
+    ports:
+      - "6379:6379"
+    volumes:
+      - falkordb-data:/var/lib/falkordb/data
+    environment:
+      - FALKORDB_ARGS=--save 60 1
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+      start_period: 2s
+    restart: unless-stopped
+
+volumes:
+  falkordb-data:
+    driver: local
