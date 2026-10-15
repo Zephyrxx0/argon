@@ -58,7 +58,7 @@ export type ResolveScopeResult = z.infer<typeof ResolveScopeResultSchema>;
 
 export const BlastRadiusParamsSchema = z.object({
   files: z.array(z.string()).min(1),
-  maxDepth: z.number().int().min(1).max(5).default(3).optional(),
+  maxDepth: z.number().int().min(1).max(5).default(3),
 });
 export type BlastRadiusParams = z.infer<typeof BlastRadiusParamsSchema>;
 
