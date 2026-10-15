@@ -178,3 +178,4 @@ describe('Gemma 4 Briefing Narrator & Schema Validation', () => {
     expect(generatorMock).toHaveBeenCalledTimes(2);
   });
 });
+

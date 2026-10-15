@@ -80,3 +80,4 @@ describe('Briefing Write-Back Memory (record_outcome)', () => {
     expect(executedQueries).toHaveLength(3);
   });
 });
+

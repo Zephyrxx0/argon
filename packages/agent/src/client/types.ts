@@ -112,3 +112,4 @@ export class GatewayUnreachableError extends GatewayError {
     this.name = 'GatewayUnreachableError';
   }
 }
+

@@ -69,3 +69,4 @@ export interface RetrievalResult {
   bundle?: EvidenceBundle;
   reason?: string;
 }
+

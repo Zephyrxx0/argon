@@ -11,3 +11,4 @@ export interface CitationValidationResult {
   verifiedNodeIds: string[];
   failureReason?: string;
 }
+

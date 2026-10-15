@@ -100,3 +100,4 @@ describe('Citation Integrity Validator', () => {
     expect(result.failureReason).toContain('0 verified graph citations found');
   });
 });
+
