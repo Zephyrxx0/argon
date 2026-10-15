@@ -3,3 +3,5 @@ export {
   FalkorUnavailableError,
   type ArgonClientConfig,
 } from './client';
+
+export { initWorkspaceGraph } from './schema/init';
