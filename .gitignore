@@ -13,4 +13,3 @@ DECISIONS.md
 PRD.md
 .planning/*.lock
 *.tsbuildinfo
-eval-report.json

@@ -264,6 +264,16 @@ program
       const outputPath = path.resolve(process.cwd(), options.output ?? 'eval-report.json');
       saveJsonReport(summaries, allResults, outputPath);
 
+      // Also ensure root eval-report.json exists when running inside monorepo
+      const monorepoRootPath = path.resolve(__dirname, '../../../eval-report.json');
+      if (outputPath !== monorepoRootPath && fs.existsSync(path.resolve(__dirname, '../../../package.json'))) {
+        try {
+          saveJsonReport(summaries, allResults, monorepoRootPath);
+        } catch {
+          // ignore
+        }
+      }
+
       if (options.json) {
         const payload = {
           timestamp: new Date().toISOString(),
