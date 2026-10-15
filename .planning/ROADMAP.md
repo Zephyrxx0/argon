@@ -18,10 +18,12 @@ Phase 1: Database Schema & Vector Foundation
 ---
 
 ## Phase 1: Database Schema & Vector Foundation
+
 **Goal:** Establish the monorepo foundation, define the FalkorDB openCypher schema with 512-d vector index, implement all 8 parameterized named queries, and verify local Transformers.js Node.js CPU embedding generation.
 
 - **Plans:**
-  - `01-01`: Setup pnpm monorepo structure (`apps/`, `packages/`) and local FalkorDB Docker test container.
+  4/4 plans complete
+
   - `01-02`: Author `schema.cypher` with constraints, node/edge types, and 512-d vector index.
   - `01-03`: Implement the 8 parameterized named queries in `packages/graph/queries/*.cypher`.
   - `01-04`: Build `packages/graph/embedding.ts` verifying Transformers.js EmbeddingGemma-2 on Node.js CPU with Matryoshka 512-d L2 re-normalization.
@@ -31,6 +33,7 @@ Phase 1: Database Schema & Vector Foundation
 ---
 
 ## Phase 2: Ingestion Pipeline & Decision Mining
+
 **Goal:** Implement the worker service that clones repositories, computes co-change coupling and components, identifies git reverts, extracts architectural decisions with temporal windows, and writes to FalkorDB using `(:IngestJob)` node tracking.
 
 - **Plans:**
@@ -44,6 +47,7 @@ Phase 1: Database Schema & Vector Foundation
 ---
 
 ## Phase 3: Query Gateway & Briefing Pipeline
+
 **Goal:** Expose read-only query endpoints via the gateway service, execute queries in parallel, run single-call Gemma 4 narration with Zod schema enforcement, enforce 100% citation integrity, and record write-back memory.
 
 - **Plans:**
@@ -57,6 +61,7 @@ Phase 1: Database Schema & Vector Foundation
 ---
 
 ## Phase 4: Next.js Frontend & Graph Canvas
+
 **Goal:** Build the user-facing web application featuring a unified command bar, contributor selector, brutalist 2077 tweakcn evidence cards, and an interactive Cytoscape.js canvas showing traversal paths behind claims.
 
 - **Plans:**
@@ -70,6 +75,7 @@ Phase 1: Database Schema & Vector Foundation
 ---
 
 ## Phase 5: Revert Backtest & Showcase Corpus
+
 **Goal:** Build the automated backtest evaluation runner comparing historical revert recall against a no-graph baseline, and pre-index the showcase demonstration repositories for judging.
 
 - **Plans:**
@@ -82,4 +88,3 @@ Phase 1: Database Schema & Vector Foundation
 
 ---
 *Roadmap defined: 2026-10-15*
-
