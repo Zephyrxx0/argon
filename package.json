@@ -12,10 +12,13 @@
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:healthcheck": "docker compose ps --filter health=healthy --format json | grep -q argon-falkordb && echo 'FalkorDB is healthy' || (docker compose ps && exit 1)",
-    "seed:showcase": "pnpm --filter @argon/eval seed"
+    "seed:showcase": "pnpm --filter @argon/eval seed",
+    "demo:check": "tsx scripts/demo-check.ts"
   },
   "devDependencies": {
+    "picocolors": "^1.1.1",
     "turbo": "^2.4.4",
+    "tsx": "^4.19.3",
     "typescript": "^5.7.3"
   }
 }

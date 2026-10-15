@@ -54,6 +54,22 @@ export async function dispatchRetrievalBundle(
       precedentPromise,
     ]);
 
+  // If queries were dispatched and all of them were rejected (e.g. database unreachable / kill switch),
+  // immediately fail closed with NO_GRAPH_DATA per PRD §3.3 & §7.4
+  const dispatchedQueries = [
+    scope.files.length > 0 ? blastSettled : null,
+    scope.components.length > 0 ? whoKnowsSettled : null,
+    scope.files.length > 0 ? constrainingSettled : null,
+    scope.queryVector && scope.queryVector.length === 512 ? precedentSettled : null,
+  ].filter((s): s is PromiseSettledResult<any> => s !== null);
+
+  if (dispatchedQueries.length > 0 && dispatchedQueries.every((s) => s.status === 'rejected')) {
+    return {
+      status: 'NO_GRAPH_DATA',
+      reason: 'Graph database query failed or database unreachable: no graph, no answer.',
+    };
+  }
+
   const allNodeIds = new Set<string>();
   const mergedNodesMap = new Map<string, any>();
   const mergedEdgesMap = new Map<string, any>();
