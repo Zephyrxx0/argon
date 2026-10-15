@@ -15,3 +15,16 @@ export {
 } from './transformers/cytoscape';
 
 export * from './queries';
+
+export {
+  ArgonEmbedder,
+  formatInput,
+  processMatryoshkaVector,
+  cosineSimilarity,
+} from './embedding/embedder';
+
+export type {
+  EmbeddingProvider,
+  EmbedderConfig,
+  EmbedResult,
+} from './embedding/types';
