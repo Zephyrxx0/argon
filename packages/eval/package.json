@@ -12,8 +12,9 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:unit": "vitest run test/metrics.test.ts test/fixtures.test.ts",
     "bench:graph": "tsx src/cli.ts bench:graph",
+    "bench:baseline": "tsx src/cli.ts bench:baseline",
+    "bench:compare": "tsx src/cli.ts bench:compare",
     "seed": "tsx src/cli.ts seed"
   },
   "dependencies": {
