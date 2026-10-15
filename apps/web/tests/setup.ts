@@ -23,4 +23,10 @@ if (typeof window !== 'undefined') {
       dispatchEvent: () => false,
     };
   };
+
+  // Mock scrollIntoView for cmdk and list views in JSDOM
+  if (typeof window.HTMLElement !== 'undefined') {
+    window.HTMLElement.prototype.scrollIntoView = function () {};
+  }
 }
+

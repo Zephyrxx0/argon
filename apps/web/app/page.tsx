@@ -3,45 +3,45 @@
 import React, { useState } from 'react';
 import { SplitViewport } from '@/components/layout/split-viewport';
 import { ShowcaseHub } from '@/components/hub/showcase-hub';
-import { Terminal, Network, Cpu, Database, Activity } from 'lucide-react';
+import { HeaderBar } from '@/components/navigation/header-bar';
+import { type Workspace } from '@/components/workspace/workspace-switcher';
+import { Network, Cpu, Database } from 'lucide-react';
 
 export default function HomePage() {
-  const [selectedTask, setSelectedTask] = useState<string | null>(null);
+  const [selectedTask, setSelectedTask] = useState<string>('');
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('ember-adr-showcase');
+  const [currentContributorId, setCurrentContributorId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSelectScenario = (query: string) => {
     setSelectedTask(query);
   };
 
+  const handleQuerySubmit = (query: string) => {
+    setSelectedTask(query);
+    setIsLoading(false);
+    setError(null);
+  };
+
+  const handleIngestSuccess = (newWorkspace: Workspace) => {
+    setCurrentWorkspaceId(newWorkspace.id);
+  };
+
   return (
     <main className="min-h-screen bg-background text-foreground flex flex-col font-mono">
-      {/* Top Navigation Stub (Plan 04-02 expands into full CommandBar & Workspace Switcher) */}
-      <header className="h-16 border-b border-border bg-card px-4 sm:px-6 flex items-center justify-between shrink-0 z-30">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-accent">
-            <Terminal className="h-5 w-5" />
-            <span className="text-sm font-black tracking-widest uppercase">ARGON // 2077</span>
-          </div>
-          <span className="hidden sm:inline-block text-xs px-2 py-0.5 border border-border bg-muted/40 text-muted-foreground uppercase">
-            Graph Engine v0.1
-          </span>
-        </div>
-
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          {selectedTask ? (
-            <div className="flex items-center gap-2">
-              <span className="text-accent font-semibold">Active Scope:</span>
-              <code className="text-foreground bg-muted px-2 py-0.5 border border-border">
-                {selectedTask}
-              </code>
-            </div>
-          ) : (
-            <div className="hidden sm:flex items-center gap-2">
-              <Activity className="h-3.5 w-3.5 text-accent animate-pulse" />
-              <span>STANDBY — AWAITING QUERY</span>
-            </div>
-          )}
-        </div>
-      </header>
+      {/* Unified Top Navigation Header */}
+      <HeaderBar
+        currentQuery={selectedTask}
+        isLoading={isLoading}
+        error={error}
+        onSubmitQuery={handleQuerySubmit}
+        currentWorkspaceId={currentWorkspaceId}
+        onSelectWorkspace={setCurrentWorkspaceId}
+        onIngestSuccess={handleIngestSuccess}
+        currentContributorId={currentContributorId}
+        onSelectContributor={setCurrentContributorId}
+      />
 
       {/* Main Dual-Pane Resizable Viewport */}
       <div className="flex-1 overflow-hidden">
