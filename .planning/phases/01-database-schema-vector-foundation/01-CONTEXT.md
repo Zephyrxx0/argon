@@ -119,3 +119,4 @@ Out of scope:
 
 *Phase: 1-Database Schema & Vector Foundation*
 *Context gathered: 2026-10-15*
+

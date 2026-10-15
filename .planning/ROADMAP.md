@@ -82,3 +82,4 @@ Phase 1: Database Schema & Vector Foundation
 
 ---
 *Roadmap defined: 2026-10-15*
+

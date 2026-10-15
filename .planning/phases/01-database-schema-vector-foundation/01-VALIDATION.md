@@ -73,3 +73,4 @@ created: 2026-10-15
 - [x] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** pending 2026-10-15
+

@@ -177,3 +177,4 @@
 ## Deferred Ideas
 
 - None — discussion stayed within Phase 1 scope.
+
