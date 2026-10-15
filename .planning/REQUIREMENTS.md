@@ -7,20 +7,20 @@
 
 ### Workspaces & Ingest Operations
 - [ ] **WS-01**: User can input any public git repository URL or select a preloaded showcase repo without an account.
-- [ ] **JOB-01**: Background worker tracks ingestion states (`pending`, `cloning`, `mining`, `indexing`, `completed`, `failed`) directly on `(:IngestJob)` graph nodes.
-- [ ] **ING-01**: Worker performs shallow/blobless git clone and derives `File`, `Person`, `Commit`/`PullRequest`, and `TOUCHES` edges.
-- [ ] **ING-02**: Worker computes co-change coupling to establish initial component boundaries and dependency edges.
-- [ ] **ING-03**: Worker identifies git revert commits to create `(:PullRequest)-[:REVERTS]->(:PullRequest)` edges.
+- [x] **JOB-01**: Background worker tracks ingestion states (`pending`, `cloning`, `mining`, `indexing`, `completed`, `failed`) directly on `(:IngestJob)` graph nodes.
+- [x] **ING-01**: Worker performs shallow/blobless git clone and derives `File`, `Person`, `Commit`/`PullRequest`, and `TOUCHES` edges.
+- [x] **ING-02**: Worker computes co-change coupling to establish initial component boundaries and dependency edges.
+- [x] **ING-03**: Worker identifies git revert commits to create `(:PullRequest)-[:REVERTS]->(:PullRequest)` edges.
 
 ### Decision Mining & Vector Search
-- [ ] **DEC-01**: Worker extracts architectural decisions from markdown ADRs/RFCs and commit messages into `(:Decision)` nodes.
-- [ ] **DEC-02**: Worker links decisions to components via `[:GOVERNS]` and tracks supersession via `[:SUPERSEDES]`, managing `valid_from` and `valid_to` timestamps.
-- [ ] **EMB-01**: Worker embeds decision titles and summaries using EmbeddingGemma-2 (`q8`, 512-d) via Transformers.js in Node.js CPU with Matryoshka truncation and L2 re-normalization.
-- [ ] **VEC-01**: FalkorDB vector index is created and populated at exactly 512 dimensions for semantic decision and precedent retrieval.
+- [x] **DEC-01**: Worker extracts architectural decisions from markdown ADRs/RFCs and commit messages into `(:Decision)` nodes.
+- [x] **DEC-02**: Worker links decisions to components via `[:GOVERNS]` and tracks supersession via `[:SUPERSEDES]`, managing `valid_from` and `valid_to` timestamps.
+- [x] **EMB-01**: Worker embeds decision titles and summaries using EmbeddingGemma-2 (`q8`, 512-d) via Transformers.js in Node.js CPU with Matryoshka truncation and L2 re-normalization.
+- [x] **VEC-01**: FalkorDB vector index is created and populated at exactly 512 dimensions for semantic decision and precedent retrieval.
 
 ### Graph Engine & Gateway
-- [ ] **GRAPH-01**: FalkorDB graph schema and constraints are established in `.cypher` files.
-- [ ] **GRAPH-02**: Eight parameterized named queries (`resolve_scope`, `blast_radius`, `risk_ranking`, `who_knows`, `constraining_decisions`, `precedent_search`, `path_between`, `component_overview`) run exclusively via `GRAPH.RO_QUERY`.
+- [x] **GRAPH-01**: FalkorDB graph schema and constraints are established in `.cypher` files.
+- [x] **GRAPH-02**: Eight parameterized named queries (`resolve_scope`, `blast_radius`, `risk_ranking`, `who_knows`, `constraining_decisions`, `precedent_search`, `path_between`, `component_overview`) run exclusively via `GRAPH.RO_QUERY`.
 - [ ] **GW-01**: Cloud Run gateway service exposes authenticated endpoints for the 8 named queries and communicates with FalkorDB over Direct VPC egress.
 
 ### Briefing Agent & Citations
@@ -57,16 +57,16 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| GRAPH-01 | Phase 1 | Pending |
-| GRAPH-02 | Phase 1 | Pending |
-| EMB-01 | Phase 1 | Pending |
-| VEC-01 | Phase 1 | Pending |
-| JOB-01 | Phase 2 | Pending |
-| ING-01 | Phase 2 | Pending |
-| ING-02 | Phase 2 | Pending |
-| ING-03 | Phase 2 | Pending |
-| DEC-01 | Phase 2 | Pending |
-| DEC-02 | Phase 2 | Pending |
+| GRAPH-01 | Phase 1 | Complete |
+| GRAPH-02 | Phase 1 | Complete |
+| EMB-01 | Phase 1 | Complete |
+| VEC-01 | Phase 1 | Complete |
+| JOB-01 | Phase 2 | Complete |
+| ING-01 | Phase 2 | Complete |
+| ING-02 | Phase 2 | Complete |
+| ING-03 | Phase 2 | Complete |
+| DEC-01 | Phase 2 | Complete |
+| DEC-02 | Phase 2 | Complete |
 | GW-01 | Phase 3 | Pending |
 | BRIEF-01 | Phase 3 | Pending |
 | BRIEF-02 | Phase 3 | Pending |

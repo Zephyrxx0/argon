@@ -72,3 +72,4 @@ None. All Phase 02 requirements are backed by automated Vitest suites and end-to
 - [x] 100% of test suites green (`19 passed`, `0 failed`, `1 skipped when offline`)
 - [x] No manual-only verification gates needed
 - [x] Nyquist compliance certified
+
