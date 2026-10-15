@@ -9,3 +9,5 @@ dist
 .env.*.local
 !.env.example
 .falkordb-data
+DECISIONS.md
+PRD.md
