@@ -1,0 +1,29 @@
+{
+  "name": "@argon/graph",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run test/embedding.test.ts",
+    "test:integration": "vitest run test/schema.test.ts test/queries.test.ts",
+    "db:schema:apply": "tsx src/schema/apply.ts"
+  },
+  "dependencies": {
+    "@google/genai": "^2.30.0",
+    "@huggingface/transformers": "^4.3.1",
+    "dotenv": "^16.4.7",
+    "falkordb": "^6.8.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@argon/tsconfig": "workspace:*",
+    "@types/node": "^22.13.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3",
+    "vitest": "^3.2.0"
+  }
+}
