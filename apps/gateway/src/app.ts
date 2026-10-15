@@ -5,11 +5,13 @@ import type { ArgonGraphClient } from '@argon/graph';
 import { bearerAuthMiddleware } from './middleware/auth.js';
 import { healthRoute } from './routes/health.js';
 import { queryRoute } from './routes/query.js';
+import { briefingRoute, type BriefingRouteOptions } from './routes/briefing.js';
 
 export interface GatewayAppOptions {
   graphClient?: ArgonGraphClient;
   gatewaySecret?: string;
   queryTimeoutMs?: number;
+  briefingOptions?: BriefingRouteOptions;
 }
 
 export function createGatewayApp(options?: GatewayAppOptions): Hono {
@@ -28,6 +30,7 @@ export function createGatewayApp(options?: GatewayAppOptions): Hono {
   // Named query routes under /api/v1
   if (options?.graphClient) {
     app.route('/api/v1', queryRoute(options.graphClient, { timeoutMs: options?.queryTimeoutMs }));
+    app.route('/api/v1', briefingRoute(options.graphClient, options.briefingOptions));
   }
 
   return app;
