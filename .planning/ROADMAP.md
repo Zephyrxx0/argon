@@ -37,6 +37,8 @@ Phase 1: Database Schema & Vector Foundation
 **Goal:** Implement the worker service that clones repositories, computes co-change coupling and components, identifies git reverts, extracts architectural decisions with temporal windows, and writes to FalkorDB using `(:IngestJob)` node tracking.
 
 - **Plans:**
+  4/4 plans complete
+
   - `02-01`: Implement `packages/ingest/git` for shallow/blobless clones, commit extraction, author mapping, and `TOUCHES` relationships.
   - `02-02`: Implement co-change coupling analysis and component grouping algorithm.
   - `02-03`: Implement markdown ADR/RFC and commit decision miner with `SUPERSEDES` and temporal validity handling.
