@@ -67,16 +67,16 @@
 | ING-03 | Phase 2 | Complete |
 | DEC-01 | Phase 2 | Complete |
 | DEC-02 | Phase 2 | Complete |
-| GW-01 | Phase 3 | Pending |
-| BRIEF-01 | Phase 3 | Pending |
-| BRIEF-02 | Phase 3 | Pending |
-| CITE-01 | Phase 3 | Pending |
-| MEM-01 | Phase 3 | Pending |
-| WS-01 | Phase 4 | Pending |
-| UI-01 | Phase 4 | Pending |
-| UI-02 | Phase 4 | Pending |
-| UI-03 | Phase 4 | Pending |
-| EVAL-01 | Phase 5 | Pending |
+| GW-01 | Phase 3 | Complete |
+| BRIEF-01 | Phase 3 | Complete |
+| BRIEF-02 | Phase 3 | Complete |
+| CITE-01 | Phase 3 | Complete |
+| MEM-01 | Phase 3 | Complete |
+| WS-01 | Phase 4 | Complete |
+| UI-01 | Phase 4 | Complete |
+| UI-02 | Phase 4 | Complete |
+| UI-03 | Phase 4 | Complete |
+| EVAL-01 | Phase 5 | Complete |
 
 **Coverage:**
 - v1 requirements: 19 total

@@ -85,6 +85,8 @@ Phase 1: Database Schema & Vector Foundation
 **Goal:** Build the automated backtest evaluation runner comparing historical revert recall against a no-graph baseline, and pre-index the showcase demonstration repositories for judging.
 
 - **Plans:**
+  4/4 plans complete
+
   - `05-01`: Build `packages/eval` backtest harness that rewinds the graph (`asOf`) to historical revert dates and computes recall@k.
   - `05-02`: Run and record the no-graph baseline benchmark for comparison.
   - `05-03`: Ingest and pre-index 2 curated public repositories (e.g. Astro / Ember with ADRs) plus an instant synthetic demo dataset.
