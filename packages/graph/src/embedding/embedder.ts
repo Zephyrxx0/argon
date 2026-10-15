@@ -28,7 +28,10 @@ export function processMatryoshkaVector(
   rawFloats: number[] | Float32Array,
   targetDim = 512
 ): number[] {
-  const sliced = Array.from(rawFloats.slice(0, targetDim));
+  let sliced = Array.from(rawFloats.slice(0, targetDim));
+  if (sliced.length < targetDim) {
+    sliced = sliced.concat(new Array(targetDim - sliced.length).fill(0));
+  }
   const norm = Math.hypot(...sliced);
 
   if (norm === 0) {

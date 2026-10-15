@@ -19,6 +19,7 @@ export async function initWorkspaceGraph(
     'CREATE INDEX FOR (d:Decision) ON (d.id)',
     'CREATE INDEX FOR (b:Briefing) ON (b.id)',
     'CREATE INDEX FOR (j:IngestJob) ON (j.id)',
+    'CREATE INDEX FOR (i:Issue) ON (i.id)',
   ];
 
   for (const stmt of indexStatements) {
@@ -40,6 +41,8 @@ export async function initWorkspaceGraph(
     { label: 'PullRequest', prop: 'number' },
     { label: 'Decision', prop: 'id' },
     { label: 'IngestJob', prop: 'id' },
+    { label: 'Briefing', prop: 'id' },
+    { label: 'Issue', prop: 'id' },
   ];
 
   for (const { label, prop } of uniqueConstraints) {

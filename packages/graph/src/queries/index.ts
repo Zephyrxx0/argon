@@ -42,12 +42,13 @@ export * from './types';
 
 const EMBEDDED_QUERIES: Record<string, string> = {
   '01_resolve_scope.cypher': `// Resolves input paths or component names to existing graph entities
-MATCH (f:File) WHERE f.path IN $paths
+OPTIONAL MATCH (f:File) WHERE f.path IN $paths
 OPTIONAL MATCH (f)-[:IN_COMPONENT]->(c:Component)
 WITH collect(DISTINCT f) AS matchedFiles, collect(DISTINCT c) AS matchedComponents
 OPTIONAL MATCH (c2:Component) WHERE c2.name IN $names
-WITH matchedFiles, matchedComponents + collect(DISTINCT c2) AS allComponents
-RETURN matchedFiles, allComponents;`,
+WITH [f IN matchedFiles WHERE f IS NOT NULL] AS cleanFiles,
+     [c IN matchedComponents + collect(DISTINCT c2) WHERE c IS NOT NULL] AS allComponents
+RETURN cleanFiles AS matchedFiles, allComponents;`,
 
   '02_blast_radius.cypher': `// Traverses touched files through components and dependency chains up to 3 hops
 MATCH (f:File) WHERE f.path IN $files
@@ -68,15 +69,15 @@ MATCH (f:File)-[:IN_COMPONENT]->(c)
 MATCH (pr:PullRequest)-[:TOUCHES]->(f)
 OPTIONAL MATCH (author:Person)-[:AUTHORED]->(pr)
 OPTIONAL MATCH (reviewer:Person)-[:REVIEWED]->(pr)
-WITH c.name AS component, author, reviewer, pr.merged_at AS mergedAt
+WITH c.name AS component, author, reviewer, count(DISTINCT pr) AS prCount
 RETURN 
   component,
   author.id AS authorId,
   author.display_name AS authorName,
-  count(DISTINCT author) AS authoredCount,
+  CASE WHEN author IS NOT NULL THEN prCount ELSE 0 END AS authoredCount,
   reviewer.id AS reviewerId,
   reviewer.display_name AS reviewerName,
-  count(DISTINCT reviewer) AS reviewedCount;`,
+  CASE WHEN reviewer IS NOT NULL THEN prCount ELSE 0 END AS reviewedCount;`,
 
   '05_constraining_decisions.cypher': `// Returns decisions governing the files that were active as of a given timestamp
 MATCH (f:File) WHERE f.path IN $files
@@ -156,7 +157,9 @@ export async function blastRadius(
   params: BlastRadiusParams
 ): Promise<DualPayload<BlastRadiusResult>> {
   const validated = BlastRadiusParamsSchema.parse(params);
-  const cypher = getCypherQuery('02_blast_radius.cypher');
+  const maxDepth = Math.min(Math.max(1, validated.maxDepth ?? 3), 5);
+  const baseCypher = getCypherQuery('02_blast_radius.cypher');
+  const cypher = baseCypher.replace('*1..3', `*1..${maxDepth}`);
   const res = await client.roQuery(workspaceId, cypher, {
     files: validated.files,
   });

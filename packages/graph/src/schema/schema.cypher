@@ -87,6 +87,7 @@ CREATE INDEX FOR (pr:PullRequest) ON (pr.number);
 CREATE INDEX FOR (d:Decision) ON (d.id);
 CREATE INDEX FOR (b:Briefing) ON (b.id);
 CREATE INDEX FOR (j:IngestJob) ON (j.id);
+CREATE INDEX FOR (i:Issue) ON (i.id);
 
 // ==========================================
 // 4. Uniqueness Constraints
@@ -98,6 +99,8 @@ CREATE INDEX FOR (j:IngestJob) ON (j.id);
 // PullRequest.number UNIQUE
 // Decision.id UNIQUE
 // IngestJob.id UNIQUE
+// Briefing.id UNIQUE
+// Issue.id UNIQUE
 
 // ==========================================
 // 5. 512-Dimensional Vector Index
