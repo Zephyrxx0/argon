@@ -132,3 +132,4 @@ Out of scope:
 
 *Phase: 3-Query Gateway & Briefing Pipeline*
 *Context gathered: 2026-10-15*
+

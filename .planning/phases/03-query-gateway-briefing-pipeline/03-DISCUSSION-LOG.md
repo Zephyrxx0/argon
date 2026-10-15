@@ -178,3 +178,4 @@
 ## Deferred Ideas
 
 - None — all decisions stayed strictly within Phase 3 scope.
+
