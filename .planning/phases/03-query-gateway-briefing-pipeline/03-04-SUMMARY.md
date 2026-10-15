@@ -28,3 +28,4 @@
 - `pnpm typecheck` passes cleanly across all packages.
 - `@argon/gateway`: 3 suites, 18 tests passing.
 - `@argon/agent`: 6 suites, 19 tests passing.
+

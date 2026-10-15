@@ -27,3 +27,4 @@
 ## Verification
 - `pnpm --filter @argon/agent exec tsc --noEmit` exits with 0 errors.
 - `pnpm --filter @argon/agent test:run` passes all 6 tests (2 suites, 6 tests, 0 failures).
+

@@ -11,3 +11,5 @@ dist
 .falkordb-data
 DECISIONS.md
 PRD.md
+.planning/*.lock
+

@@ -28,3 +28,4 @@
 ## Verification
 - `pnpm --filter @argon/gateway exec tsc --noEmit` exits with 0 errors.
 - `pnpm --filter @argon/gateway test:run` passes all 15 tests (2 suites, 15 tests, 0 failures).
+
