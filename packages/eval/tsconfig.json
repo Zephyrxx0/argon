@@ -1,0 +1,9 @@
+{
+  "extends": "@argon/tsconfig/node.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "."
+  },
+  "include": ["src/**/*", "fixtures/**/*", "test/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
