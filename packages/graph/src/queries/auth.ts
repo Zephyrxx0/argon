@@ -15,6 +15,7 @@ export interface SetUserWorkspaceAccessParams {
 export interface MigrateGuestAccessParams {
   guestId: string;
   authUserId: string;
+  workspaceId?: string;
 }
 
 /**
@@ -81,6 +82,7 @@ export async function setUserWorkspaceAccess(
 
 /**
  * Migrates temporary guest ACCESSES edges to permanent authenticated user upon account linking (D-14).
+ * Detaches and removes the temporary guest node.
  */
 export async function migrateGuestAccess(
   client: ArgonGraphClient,
@@ -95,9 +97,9 @@ export async function migrateGuestAccess(
     RETURN count(w) AS migratedCount;
   `;
 
-  // Run migration in default or target workspace
+  const targetWorkspace = params.workspaceId ?? 'ember-adr-showcase';
   const res = await client.query<{ migratedCount: number }>(
-    'ember-adr-showcase',
+    targetWorkspace,
     cypher,
     {
       guestId: params.guestId,
@@ -107,5 +109,15 @@ export async function migrateGuestAccess(
 
   const row = res.data?.[0];
   const count = row ? Number((row as any).migratedCount ?? 0) : 0;
+
+  // Clean up any detached guest node if guest had no ACCESSES edges
+  if (count === 0) {
+    await client.query(
+      targetWorkspace,
+      'MATCH (guest:User {id: $guestId}) DETACH DELETE guest',
+      { guestId: params.guestId }
+    ).catch(() => {});
+  }
+
   return count;
 }

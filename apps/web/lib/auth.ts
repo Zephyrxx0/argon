@@ -84,16 +84,14 @@ export const auth = betterAuth({
       emailDomainName: 'guest.argon.internal',
       onLinkAccount: async ({ anonymousUser, newUser }: { anonymousUser: any; newUser: any }) => {
         try {
-          const graphModule = (await import('@argon/graph')) as any;
-          if (graphModule.ArgonGraphClient && graphModule.migrateGuestAccess) {
-            const graphClient = new graphModule.ArgonGraphClient();
-            await graphClient.connect();
-            await graphModule.migrateGuestAccess(graphClient, {
-              guestId: anonymousUser?.user?.id || anonymousUser?.id,
-              authUserId: newUser?.user?.id || newUser?.id,
-            });
-            await graphClient.close();
-          }
+          const { ArgonGraphClient, migrateGuestAccess } = await import('@argon/graph');
+          const graphClient = new ArgonGraphClient();
+          await graphClient.connect();
+          await migrateGuestAccess(graphClient, {
+            guestId: anonymousUser?.id || anonymousUser?.user?.id,
+            authUserId: newUser?.id || newUser?.user?.id,
+          });
+          await graphClient.close();
         } catch (err) {
           console.error('[auth:onLinkAccount] Failed to migrate guest graph accesses:', err);
         }

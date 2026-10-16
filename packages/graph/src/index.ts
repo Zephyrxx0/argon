@@ -15,6 +15,14 @@ export {
 } from './transformers/cytoscape';
 
 export * from './queries';
+export {
+  checkWorkspaceAccess,
+  setUserWorkspaceAccess,
+  migrateGuestAccess,
+  type WorkspaceAccessResult,
+  type SetUserWorkspaceAccessParams,
+  type MigrateGuestAccessParams,
+} from './queries/auth';
 
 export {
   ArgonEmbedder,
