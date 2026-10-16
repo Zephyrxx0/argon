@@ -180,3 +180,4 @@
 - SYNC-01 / SYNC-02 / SYNC-03 (Phase 8): GitHub webhook receiver and incremental sync engine on push and pull request events.
 - ORG-01 (v3.0): Multi-user organization team spaces with role-based access control.
 - CROSS-01 (v3.0): Cross-repository multi-graph dependency analysis.
+
