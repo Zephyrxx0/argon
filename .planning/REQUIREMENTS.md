@@ -58,3 +58,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SYNC-01 | Phase 08 | Pending |
 | SYNC-02 | Phase 08 | Pending |
 | SYNC-03 | Phase 08 | Pending |
+

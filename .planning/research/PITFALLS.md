@@ -35,3 +35,4 @@
 - **Warning Signs:** Any endpoint accepting `:workspaceId` without matching against `[:ACCESSES]` edge.
 - **Mitigation:**
   - Create `09_check_workspace_access.cypher`. Gateway executes this check on FalkorDB before running any requested named query. If check returns false and workspace is not public, return `403 Forbidden` immediately.
+

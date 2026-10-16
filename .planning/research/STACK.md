@@ -80,3 +80,4 @@ pnpm --filter @argon/ingest add @octokit/auth-app
 - **Do NOT use Prisma / Drizzle / PostgreSQL**: Argon relies strictly on FalkorDB. NextAuth must be used in stateless JWT mode (`session: { strategy: "jwt" }`).
 - **Do NOT use Lucia Auth**: Lucia is officially deprecated.
 - **Do NOT store GitHub App private keys or installation tokens in FalkorDB**: Private keys live strictly in environment variables; installation tokens are ephemeral and generated on demand in memory.
+

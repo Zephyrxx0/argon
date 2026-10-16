@@ -79,3 +79,4 @@
    - Creates `[:TOUCHES]` edges to `(:File)` nodes
    - Recalculates co-change coupling for modified file pairs
 5. If the commit contains modifications in ADR/RFC paths (`docs/adr/*.md`), gateway parses frontmatter/supersession headers and calls `12_advance_adr_validity.cypher` to update temporal validity without full clone.
+

@@ -72,3 +72,4 @@
 
 **Should have (differentiators):**
 - **Live Canvas Pulse:** Frontend notification or Cytoscape node pulse when an incremental webhook event updates the active workspace graph.
+
