@@ -19,7 +19,7 @@ Phase 6: Authentication & Multi-Tenant Authorization (AUTH-01, AUTH-02, TENANT-0
 ## Phases
 
 - [x] **Phase 6: Authentication & Multi-Tenant Authorization** — Better Auth GitHub OAuth integration with anonymous guest plugin, stateless cookie sessions, and FalkorDB graph multi-tenancy. (completed 2026-10-16)
-- [ ] **Phase 7: Authenticated Ingestion & Private Repo Selector** — GitHub App installation token generation, secret-scrubbed shallow cloning, and private repository selector.
+- [x] **Phase 7: Authenticated Ingestion & Private Repo Selector** — GitHub App installation token generation, secret-scrubbed shallow cloning, and private repository selector. (completed 2026-10-16)
 - [ ] **Phase 8: Webhook Receiver & Incremental Sync Engine** — HMAC-verified webhook handler, incremental commit/touch updates, ADR temporal validity advancement, and live sync pulse.
 
 ---
@@ -37,7 +37,7 @@ Phase 6: Authentication & Multi-Tenant Authorization (AUTH-01, AUTH-02, TENANT-0
   2. Unauthenticated visitors can browse public showcase workspaces and run graph queries via Better Auth's `anonymous()` plugin without forced login prompts or redirect loops.
   3. FalkorDB schema enforces `(:User)-[:ACCESSES]->(:Workspace)` constraints and gateway rejects unauthorized query access to private workspaces with `403 Forbidden`.
 
-**Plans**: 3 plans (TBD during Phase 6 planning)
+**Plans**: 3 plans (completed 2026-10-16)
 
 ---
 
@@ -52,7 +52,7 @@ Phase 6: Authentication & Multi-Tenant Authorization (AUTH-01, AUTH-02, TENANT-0
   2. Ingestion engine successfully clones a private repository using short-lived installation tokens without writing tokens to logs, stdout/stderr, or `(:IngestJob.error)`.
   3. Mined commits link commit author identities to graph `(:Person)` nodes matching authenticated user profiles.
 
-**Plans**: 3 plans (TBD during Phase 7 planning)
+**Plans**: 3 plans (completed 2026-10-16)
 
 ---
 
