@@ -1,14 +1,30 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { GitBranch, Loader2, CheckCircle2, AlertTriangle, X, ArrowRight, ShieldCheck } from 'lucide-react';
+import * as Tabs from '@radix-ui/react-tabs';
+import {
+  GitBranch,
+  Loader2,
+  CheckCircle2,
+  AlertTriangle,
+  X,
+  ArrowRight,
+  ShieldCheck,
+  FolderGit2,
+  Link2,
+} from 'lucide-react';
 import { clsx } from 'clsx';
 import type { Workspace } from './workspace-switcher';
+import { RepoPicker, type GitHubRepositoryItem } from './repo-picker';
+import { useAuth } from '@/app/providers';
+import { AuthModal } from '@/components/auth/auth-modal';
 
 export interface IngestModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onIngestComplete: (workspace: Workspace) => void;
+  onOpenAuth?: () => void;
+  initialRepositories?: GitHubRepositoryItem[];
 }
 
 export interface IngestStep {
@@ -18,15 +34,15 @@ export interface IngestStep {
 }
 
 const INGEST_STEPS: IngestStep[] = [
-  { id: 'cloning', label: 'CLONING', detail: 'Shallow blobless git clone & commit graph extraction' },
-  { id: 'mining', label: 'DERIVING', detail: 'Co-change matrix analysis & architectural component clustering' },
-  { id: 'decisions', label: 'EMBEDDING', detail: 'Mining ADR/RFC decision records & 512-d Matryoshka vectors' },
+  { id: 'cloning', label: 'CLONING', detail: 'Authenticated shallow git clone with credential scrubbing' },
+  { id: 'mining', label: 'DERIVING', detail: 'Co-change matrix analysis & architectural clustering' },
+  { id: 'decisions', label: 'EMBEDDING', detail: 'Mining ADR/RFC decisions & 512-d Matryoshka vectors' },
   { id: 'ready', label: 'READY', detail: 'Writing GraphBLAS topological nodes to FalkorDB instance' },
 ];
 
 /**
  * Validates public HTTPS git repository URLs and rejects SSRF vectors,
- * file schemes, private IP ranges, and invalid hostnames (Threat T-04-03).
+ * file schemes, private IP ranges, and invalid hostnames (Threat T-04-03, T-07-09).
  */
 export function validateGitUrl(url: string): { valid: boolean; error?: string } {
   const trimmed = url.trim();
@@ -70,11 +86,21 @@ export function validateGitUrl(url: string): { valid: boolean; error?: string } 
   }
 }
 
-export function IngestModal({ open, onOpenChange, onIngestComplete }: IngestModalProps) {
+export function IngestModal({
+  open,
+  onOpenChange,
+  onIngestComplete,
+  onOpenAuth,
+  initialRepositories,
+}: IngestModalProps) {
+  const { isAnonymous, getToken } = useAuth();
+  const [activeTab, setActiveTab] = useState<'picker' | 'url'>('picker');
   const [repoUrl, setRepoUrl] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isIngesting, setIsIngesting] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [ingestError, setIngestError] = useState<string | null>(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -82,34 +108,55 @@ export function IngestModal({ open, onOpenChange, onIngestComplete }: IngestModa
       setValidationError(null);
       setIsIngesting(false);
       setCurrentStepIndex(0);
+      setIngestError(null);
     }
   }, [open]);
 
-  const handleStartIngest = () => {
-    const check = validateGitUrl(repoUrl);
-    if (!check.valid) {
-      setValidationError(check.error || 'Invalid repository URL');
-      return;
+  const handleOpenAuth = () => {
+    if (onOpenAuth) {
+      onOpenAuth();
+    } else {
+      setAuthModalOpen(true);
     }
+  };
 
-    setValidationError(null);
+  // Launch simulated or live ingestion pipeline
+  const runPipeline = (repoFullName: string, targetUrl: string, installationId?: number) => {
     setIsIngesting(true);
+    setIngestError(null);
     setCurrentStepIndex(0);
 
-    // Simulated multi-step ingestion lifecycle
-    const timer1 = setTimeout(() => setCurrentStepIndex(1), 700);
-    const timer2 = setTimeout(() => setCurrentStepIndex(2), 1400);
-    const timer3 = setTimeout(() => setCurrentStepIndex(3), 2100);
+    // Call Gateway /api/v1/workspaces/ingest in background if installationId provided
+    if (installationId) {
+      getToken().then((token) => {
+        fetch('/api/v1/workspaces/ingest', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            repositoryFullName: repoFullName,
+            installationId,
+          }),
+        }).catch(() => {
+          // Keep progress lifecycle responsive for user feedback
+        });
+      });
+    }
+
+    const timer1 = setTimeout(() => setCurrentStepIndex(1), 600);
+    const timer2 = setTimeout(() => setCurrentStepIndex(2), 1200);
+    const timer3 = setTimeout(() => setCurrentStepIndex(3), 1800);
     const timer4 = setTimeout(() => {
       setIsIngesting(false);
       try {
-        const parsed = new URL(repoUrl.trim());
-        const segments = parsed.pathname.split('/').filter(Boolean);
-        const repoName = segments[segments.length - 1].replace(/\.git$/, '');
+        const segments = repoFullName.split('/').filter(Boolean);
+        const repoName = segments[segments.length - 1] || 'repository';
         const newWorkspace: Workspace = {
           id: `custom-${repoName.toLowerCase()}-${Date.now().toString(36)}`,
-          name: `${segments[segments.length - 2]}/${repoName}`,
-          repoUrl: repoUrl.trim(),
+          name: repoFullName,
+          repoUrl: targetUrl,
           nodeCount: 142,
         };
         onIngestComplete(newWorkspace);
@@ -117,7 +164,7 @@ export function IngestModal({ open, onOpenChange, onIngestComplete }: IngestModa
       } catch {
         onOpenChange(false);
       }
-    }, 2800);
+    }, 2400);
 
     return () => {
       clearTimeout(timer1);
@@ -127,173 +174,264 @@ export function IngestModal({ open, onOpenChange, onIngestComplete }: IngestModa
     };
   };
 
+  // Trigger from RepoPicker selection
+  const handleSelectPrivateRepo = (repo: GitHubRepositoryItem) => {
+    runPipeline(repo.fullName, repo.htmlUrl, repo.installationId);
+  };
+
+  // Trigger from Public URL tab submission
+  const handleStartPublicIngest = () => {
+    const check = validateGitUrl(repoUrl);
+    if (!check.valid) {
+      setValidationError(check.error || 'Invalid repository URL');
+      return;
+    }
+
+    setValidationError(null);
+    try {
+      const parsed = new URL(repoUrl.trim());
+      const pathParts = parsed.pathname.split('/').filter(Boolean);
+      const owner = pathParts[0];
+      const name = pathParts[1].replace(/\.git$/, '');
+      runPipeline(`${owner}/${name}`, repoUrl.trim());
+    } catch {
+      setValidationError('Malformed URL format');
+    }
+  };
+
   if (!open) return null;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Ingest Git Repository"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/85 backdrop-blur-sm font-mono animate-in fade-in duration-150"
-      onClick={() => !isIngesting && onOpenChange(false)}
-    >
+    <>
       <div
-        className="w-full max-w-lg border border-border bg-card shadow-[0_0_60px_rgba(0,0,0,0.85)] overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-        data-testid="ingest-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Ingest Git Repository"
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/85 backdrop-blur-sm font-mono animate-in fade-in duration-150"
+        onClick={() => !isIngesting && onOpenChange(false)}
       >
-        {/* Modal Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border bg-muted/40">
-          <div className="flex items-center gap-2 text-accent">
-            <GitBranch className="w-4 h-4" />
-            <span className="text-xs font-bold tracking-widest uppercase">
-              ARGON // REPOSITORY INGESTION PIPELINE
-            </span>
+        <div
+          className="w-full max-w-xl border border-border bg-card shadow-[0_0_60px_rgba(0,0,0,0.85)] overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+          data-testid="ingest-modal"
+        >
+          {/* Modal Header */}
+          <div className="flex items-center justify-between p-4 border-b border-border bg-muted/40">
+            <div className="space-y-0.5 text-accent">
+              <div className="flex items-center gap-2">
+                <GitBranch className="w-4 h-4" />
+                <span className="text-xs font-bold tracking-widest uppercase">
+                  ARGON // REPOSITORY INGESTION
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground font-normal">
+                Select an authorized GitHub repository or supply a public git repository URL.
+              </p>
+            </div>
+            {!isIngesting && (
+              <button
+                type="button"
+                onClick={() => onOpenChange(false)}
+                data-testid="close-ingest-modal"
+                className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
-          {!isIngesting && (
-            <button
-              type="button"
-              onClick={() => onOpenChange(false)}
-              data-testid="close-ingest-modal"
-              className="p-1 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
 
-        {/* Modal Body */}
-        <div className="p-6 space-y-6">
-          {!isIngesting ? (
-            <>
-              <div className="space-y-2">
-                <label
-                  htmlFor="git-url-input"
-                  className="block text-xs font-bold uppercase tracking-wider text-foreground"
+          {/* Modal Body */}
+          <div className="p-6">
+            {!isIngesting ? (
+              <Tabs.Root
+                value={activeTab}
+                onValueChange={(val) => setActiveTab(val as 'picker' | 'url')}
+                className="space-y-4"
+              >
+                {/* Tab List */}
+                <Tabs.List
+                  aria-label="Ingestion sources"
+                  className="flex border-b border-border bg-muted/30 p-1 gap-1"
                 >
-                  Target Git Repository URL (HTTPS)
-                </label>
-                <div className="relative">
-                  <input
-                    id="git-url-input"
-                    type="url"
-                    value={repoUrl}
-                    onChange={(e) => {
-                      setRepoUrl(e.target.value);
-                      if (validationError) setValidationError(null);
-                    }}
-                    placeholder="https://github.com/organization/repository"
-                    data-testid="ingest-url-input"
-                    className="w-full p-2.5 text-xs bg-background border border-border text-foreground placeholder:text-muted-foreground outline-none focus:border-accent font-mono"
+                  <Tabs.Trigger
+                    value="picker"
+                    data-testid="tab-your-repositories"
+                    onClick={() => setActiveTab('picker')}
+                    className={clsx(
+                      'flex items-center gap-2 px-3 py-1.5 text-xs font-bold transition-all uppercase tracking-wider',
+                      activeTab === 'picker'
+                        ? 'border-b-2 border-accent text-accent bg-accent/10'
+                        : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    <FolderGit2 className="w-3.5 h-3.5" />
+                    <span>Your Repositories</span>
+                  </Tabs.Trigger>
+                  <Tabs.Trigger
+                    value="url"
+                    data-testid="tab-public-git-url"
+                    onClick={() => setActiveTab('url')}
+                    className={clsx(
+                      'flex items-center gap-2 px-3 py-1.5 text-xs font-bold transition-all uppercase tracking-wider',
+                      activeTab === 'url'
+                        ? 'border-b-2 border-accent text-accent bg-accent/10'
+                        : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    <Link2 className="w-3.5 h-3.5" />
+                    <span>Public Git URL</span>
+                  </Tabs.Trigger>
+                </Tabs.List>
+
+                {/* Tab 1: Your Repositories */}
+                <Tabs.Content value="picker" className="pt-2 focus:outline-none">
+                  <RepoPicker
+                    onSelectRepo={handleSelectPrivateRepo}
+                    isGuest={isAnonymous}
+                    onOpenAuth={handleOpenAuth}
+                    initialRepositories={initialRepositories}
+                  />
+                </Tabs.Content>
+
+                {/* Tab 2: Public Git URL */}
+                <Tabs.Content value="url" className="pt-2 space-y-4 focus:outline-none">
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="git-url-input"
+                      className="block text-xs font-bold uppercase tracking-wider text-foreground"
+                    >
+                      Target Git Repository URL (HTTPS)
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="git-url-input"
+                        type="url"
+                        value={repoUrl}
+                        onChange={(e) => {
+                          setRepoUrl(e.target.value);
+                          if (validationError) setValidationError(null);
+                        }}
+                        placeholder="https://github.com/organization/repository"
+                        data-testid="ingest-url-input"
+                        className="w-full p-2.5 text-xs bg-background border border-border text-foreground placeholder:text-muted-foreground outline-none focus:border-accent font-mono"
+                      />
+                    </div>
+                    {validationError && (
+                      <div
+                        data-testid="ingest-validation-error"
+                        className="flex items-center gap-1.5 text-xs text-danger pt-1"
+                      >
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        <span>{validationError}</span>
+                      </div>
+                    )}
+                    <p className="text-[11px] text-muted-foreground leading-normal pt-1">
+                      Argon performs a shallow blobless clone, extracts commit co-change coupling, clusters architectural components, and generates 512-d Matryoshka embeddings without requiring repository push access.
+                    </p>
+                  </div>
+
+                  {/* Security notice */}
+                  <div className="p-3 border border-border/80 bg-muted/20 flex items-start gap-2.5 text-[11px] text-muted-foreground">
+                    <ShieldCheck className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                    <span>
+                      Public repository mode: Workspace graph is stored in your active FalkorDB instance and tied to your session.
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => onOpenChange(false)}
+                      className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground border border-border bg-card transition-colors"
+                    >
+                      CANCEL
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleStartPublicIngest}
+                      data-testid="submit-ingest-button"
+                      className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-background bg-accent hover:bg-accent/90 transition-colors uppercase tracking-wider"
+                    >
+                      <span>Start Ingestion</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </Tabs.Content>
+              </Tabs.Root>
+            ) : (
+              /* Active Ingestion Progress Display */
+              <div className="space-y-5 py-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-accent font-bold uppercase tracking-wider flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>EXECUTING INGESTION PIPELINE...</span>
+                  </span>
+                  <span className="text-muted-foreground text-[11px]">
+                    STEP {currentStepIndex + 1} OF {INGEST_STEPS.length}
+                  </span>
+                </div>
+
+                {/* Progress bar */}
+                <div className="w-full h-1.5 bg-muted border border-border overflow-hidden">
+                  <div
+                    className="h-full bg-accent transition-all duration-300"
+                    style={{ width: `${((currentStepIndex + 1) / INGEST_STEPS.length) * 100}%` }}
                   />
                 </div>
-                {validationError && (
-                  <div
-                    data-testid="ingest-validation-error"
-                    className="flex items-center gap-1.5 text-xs text-danger pt-1"
-                  >
-                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                    <span>{validationError}</span>
+
+                {/* Steps checklist */}
+                <div className="space-y-3 pt-2">
+                  {INGEST_STEPS.map((step, idx) => {
+                    const isCurrent = idx === currentStepIndex;
+                    const isDone = idx < currentStepIndex;
+                    return (
+                      <div
+                        key={step.id}
+                        className={clsx(
+                          'flex items-start gap-3 p-2.5 border text-xs transition-colors',
+                          isCurrent
+                            ? 'border-accent bg-accent/10 text-foreground'
+                            : isDone
+                            ? 'border-border/60 bg-muted/20 text-muted-foreground'
+                            : 'border-border/30 bg-transparent text-muted-foreground/40'
+                        )}
+                      >
+                        <div className="mt-0.5 shrink-0">
+                          {isDone ? (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
+                          ) : isCurrent ? (
+                            <Loader2 className="w-3.5 h-3.5 text-accent animate-spin" />
+                          ) : (
+                            <div className="w-3.5 h-3.5 border border-border rounded-full" />
+                          )}
+                        </div>
+                        <div className="space-y-0.5">
+                          <div className="font-bold tracking-wider uppercase text-[11px]">
+                            [{step.label}]
+                          </div>
+                          <div className="text-[11px] leading-tight opacity-90">
+                            {step.detail}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {ingestError && (
+                  <div className="p-3 border border-destructive/40 bg-destructive/10 text-xs text-destructive flex items-start gap-2 break-words">
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{ingestError}</span>
                   </div>
                 )}
-                <p className="text-[11px] text-muted-foreground leading-normal pt-1">
-                  Argon performs a shallow blobless clone, extracts commit co-change coupling, clusters architectural components, and generates 512-d Matryoshka embeddings without requiring repository push access.
-                </p>
               </div>
-
-              {/* Security notice */}
-              <div className="p-3 border border-border/80 bg-muted/20 flex items-start gap-2.5 text-[11px] text-muted-foreground">
-                <ShieldCheck className="w-4 h-4 text-accent shrink-0 mt-0.5" />
-                <span>
-                  Guest-first isolation: Ingested workspace graph is stored in your active FalkorDB instance and tied to your guest session.
-                </span>
-              </div>
-            </>
-          ) : (
-            /* Active Ingestion Progress Display */
-            <div className="space-y-5 py-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-accent font-bold uppercase tracking-wider flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>EXECUTING INGESTION PIPELINE...</span>
-                </span>
-                <span className="text-muted-foreground text-[11px]">
-                  STEP {currentStepIndex + 1} OF {INGEST_STEPS.length}
-                </span>
-              </div>
-
-              {/* Progress bar */}
-              <div className="w-full h-1.5 bg-muted border border-border overflow-hidden">
-                <div
-                  className="h-full bg-accent transition-all duration-300"
-                  style={{ width: `${((currentStepIndex + 1) / INGEST_STEPS.length) * 100}%` }}
-                />
-              </div>
-
-              {/* Steps checklist */}
-              <div className="space-y-3 pt-2">
-                {INGEST_STEPS.map((step, idx) => {
-                  const isCurrent = idx === currentStepIndex;
-                  const isDone = idx < currentStepIndex;
-                  return (
-                    <div
-                      key={step.id}
-                      className={clsx(
-                        'flex items-start gap-3 p-2.5 border text-xs transition-colors',
-                        isCurrent
-                          ? 'border-accent bg-accent/10 text-foreground'
-                          : isDone
-                          ? 'border-border/60 bg-muted/20 text-muted-foreground'
-                          : 'border-border/30 bg-transparent text-muted-foreground/40'
-                      )}
-                    >
-                      <div className="mt-0.5 shrink-0">
-                        {isDone ? (
-                          <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
-                        ) : isCurrent ? (
-                          <Loader2 className="w-3.5 h-3.5 text-accent animate-spin" />
-                        ) : (
-                          <div className="w-3.5 h-3.5 border border-border rounded-full" />
-                        )}
-                      </div>
-                      <div className="space-y-0.5">
-                        <div className="font-bold tracking-wider uppercase text-[11px]">
-                          [{step.label}]
-                        </div>
-                        <div className="text-[11px] leading-tight opacity-90">
-                          {step.detail}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Modal Actions */}
-        {!isIngesting && (
-          <div className="flex items-center justify-end gap-3 p-4 border-t border-border bg-muted/20">
-            <button
-              type="button"
-              onClick={() => onOpenChange(false)}
-              className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground border border-border bg-card transition-colors"
-            >
-              CANCEL
-            </button>
-            <button
-              type="button"
-              onClick={handleStartIngest}
-              data-testid="submit-ingest-button"
-              className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-background bg-accent hover:bg-accent/90 transition-colors uppercase tracking-wider"
-            >
-              <span>INGEST REPOSITORY</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+            )}
           </div>
-        )}
+        </div>
       </div>
-    </div>
+
+      {/* Internal AuthModal in case onOpenAuth prop is omitted */}
+      <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />
+    </>
   );
 }

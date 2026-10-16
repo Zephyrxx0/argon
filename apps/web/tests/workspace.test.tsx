@@ -96,6 +96,11 @@ describe('IngestModal Component', () => {
       />
     );
 
+    const publicTab = screen.queryByTestId('tab-public-git-url');
+    if (publicTab) {
+      fireEvent.click(publicTab);
+    }
+
     const input = screen.getByTestId('ingest-url-input');
     fireEvent.change(input, { target: { value: 'http://insecure-repo.com/foo' } });
 

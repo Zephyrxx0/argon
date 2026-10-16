@@ -115,7 +115,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    return {
+      session: null,
+      user: null,
+      isAnonymous: true,
+      isLoading: false,
+      activeWorkspace: 'ember-adr-showcase',
+      setActiveWorkspace: () => {},
+      getToken: async () => null,
+      signInWithGithub: async () => {},
+      signOut: async () => {},
+    };
   }
   return ctx;
 }

@@ -1,8 +1,9 @@
 'use client';
 
 import React from 'react';
-import { X, Compass } from 'lucide-react';
+import { X, Compass, ExternalLink, ShieldCheck, User } from 'lucide-react';
 import { clsx } from 'clsx';
+import { useAuth } from '@/app/providers';
 
 export interface InspectedNode {
   id: string;
@@ -19,9 +20,27 @@ export interface NodeInspectorProps {
 }
 
 export function NodeInspector({ node, onClose, className }: NodeInspectorProps) {
+  const { user, isAnonymous } = useAuth();
   if (!node) return null;
 
   const cleanId = node.id.startsWith('#') ? node.id.slice(1) : node.id;
+  const isPerson = node.type.toLowerCase() === 'person' || node.type.toLowerCase() === 'author';
+
+  // Extract linked user metadata (TENANT-02, D-16)
+  const githubLogin = (node.properties?.github_login || node.properties?.login || node.properties?.user_login) as string | undefined;
+  const avatarUrl = (node.properties?.avatar_url || node.properties?.avatar) as string | undefined;
+  const userId = (node.properties?.user_id || node.properties?.userId) as string | undefined;
+  const commitsCount = (node.properties?.commits || node.properties?.commit_count) as number | undefined;
+
+  const isLinked = Boolean(githubLogin || avatarUrl || userId);
+
+  const isYou = Boolean(
+    !isAnonymous &&
+      user &&
+      ((userId && userId === user.id) ||
+        (githubLogin && user.login && githubLogin.toLowerCase() === user.login.toLowerCase()) ||
+        (user.name && node.label.toLowerCase() === user.name.toLowerCase()))
+  );
 
   const handleJumpToCard = () => {
     // Attempt to locate card element by data-testid or ID
@@ -66,11 +85,76 @@ export function NodeInspector({ node, onClose, className }: NodeInspectorProps) 
         </button>
       </div>
 
-      {/* Node Title / Label */}
-      <div>
-        <h4 className="text-xs font-bold text-foreground leading-snug break-words">
-          {node.label}
-        </h4>
+      {/* Node Title / Label & Contributor Profile */}
+      <div className="space-y-2">
+        {isPerson && isLinked ? (
+          <div className="flex items-start gap-2.5 p-2 border border-accent/30 bg-accent/5 rounded-sm">
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={node.label}
+                className="w-8 h-8 rounded-full border border-accent/50 object-cover shrink-0"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full border border-border bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0">
+                <User className="w-4 h-4 text-accent" />
+              </div>
+            )}
+            <div className="space-y-0.5 min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h4 className="text-xs font-bold text-foreground leading-snug truncate">
+                  {node.label}
+                </h4>
+                {isYou && (
+                  <span
+                    data-testid="node-inspector-you-badge"
+                    className="bg-accent/20 text-accent border border-accent/40 font-mono text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0"
+                  >
+                    YOU
+                  </span>
+                )}
+              </div>
+              <div
+                data-testid="verified-github-badge"
+                className="flex items-center gap-1 text-[10px] text-accent font-semibold"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                <span>Verified GitHub Profile</span>
+              </div>
+              {githubLogin && (
+                <a
+                  href={`https://github.com/${githubLogin}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-testid="github-profile-link"
+                  className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground hover:underline transition-colors pt-0.5"
+                >
+                  <span>@{githubLogin}</span>
+                  <ExternalLink className="w-2.5 h-2.5" />
+                </a>
+              )}
+              {commitsCount !== undefined && (
+                <div className="text-[10px] text-muted-foreground font-mono pt-0.5">
+                  {commitsCount} commits
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <h4 className="text-xs font-bold text-foreground leading-snug break-words">
+              {node.label}
+            </h4>
+            {isPerson && isYou && (
+              <span
+                data-testid="node-inspector-you-badge"
+                className="bg-accent/20 text-accent border border-accent/40 font-mono text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0"
+              >
+                YOU
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Properties List */}

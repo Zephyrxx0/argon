@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { User, UserCheck, ChevronDown, Search, X, Check } from 'lucide-react';
 import { clsx } from 'clsx';
+import { useAuth } from '@/app/providers';
 
 export interface Contributor {
   id: string;
@@ -10,6 +11,9 @@ export interface Contributor {
   role: string;
   commits: number;
   lastActive: string;
+  avatarUrl?: string;
+  login?: string;
+  userId?: string;
 }
 
 export const SAMPLE_CONTRIBUTORS: Contributor[] = [
@@ -32,11 +36,20 @@ export function ContributorPicker({
   onSelectContributor,
   className,
 }: ContributorPickerProps) {
+  const { user, isAnonymous } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const activeContributor = contributors.find((c) => c.id === currentContributorId);
+
+  const checkIsYou = (c: Contributor) => {
+    if (isAnonymous || !user) return false;
+    if (c.userId && c.userId === user.id) return true;
+    if (c.login && user.login && c.login.toLowerCase() === user.login.toLowerCase()) return true;
+    if (user.name && c.name.toLowerCase() === user.name.toLowerCase()) return true;
+    return false;
+  };
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -81,6 +94,14 @@ export function ContributorPicker({
         <span className="font-medium truncate max-w-[100px] sm:max-w-[140px]">
           {activeContributor ? activeContributor.name : 'Guest'}
         </span>
+        {activeContributor && checkIsYou(activeContributor) && (
+          <span
+            data-testid="contributor-trigger-you-badge"
+            className="text-[9px] font-bold text-accent bg-accent/20 px-1 border border-accent/40 rounded shrink-0"
+          >
+            YOU
+          </span>
+        )}
         {activeContributor && (
           <span className="hidden md:inline-block text-[10px] text-purple-400/80 bg-purple-900/30 px-1 border border-purple-500/30">
             {activeContributor.role.split(' ')[0]}
@@ -137,6 +158,7 @@ export function ContributorPicker({
             ) : (
               filtered.map((contributor) => {
                 const isSelected = contributor.id === activeContributor?.id;
+                const isYou = checkIsYou(contributor);
                 return (
                   <button
                     key={contributor.id}
@@ -144,21 +166,38 @@ export function ContributorPicker({
                     onClick={() => handleSelect(contributor.id)}
                     data-testid={`contributor-item-${contributor.id}`}
                     className={clsx(
-                      'w-full flex items-center justify-between p-2.5 text-left text-xs transition-colors',
+                      'w-full flex items-center justify-between p-2.5 text-left text-xs transition-colors gap-2',
                       isSelected
                         ? 'bg-purple-950/40 text-purple-200 border-l-2 border-purple-500'
                         : 'text-foreground hover:bg-muted/60 hover:text-purple-300'
                     )}
                   >
-                    <div className="space-y-0.5 truncate pr-2">
-                      <div className="flex items-center gap-1.5 font-bold">
-                        {isSelected && <Check className="w-3 h-3 text-purple-400 shrink-0" />}
-                        <span>{contributor.name}</span>
-                      </div>
-                      <div className="text-[10px] text-muted-foreground flex items-center gap-1.5">
-                        <span className="text-purple-400">{contributor.role}</span>
-                        <span>•</span>
-                        <span>Active {contributor.lastActive}</span>
+                    <div className="flex items-center gap-2 min-w-0 pr-2">
+                      {contributor.avatarUrl ? (
+                        <img
+                          src={contributor.avatarUrl}
+                          alt={contributor.name}
+                          className="w-4 h-4 rounded-full border border-border shrink-0 object-cover"
+                        />
+                      ) : null}
+                      <div className="space-y-0.5 truncate">
+                        <div className="flex items-center gap-1.5 font-bold">
+                          {isSelected && <Check className="w-3 h-3 text-purple-400 shrink-0" />}
+                          <span className="truncate">{contributor.name}</span>
+                          {isYou && (
+                            <span
+                              data-testid="contributor-you-badge"
+                              className="bg-accent/20 text-accent border border-accent/40 font-mono text-[9px] font-bold px-1 py-0.2 rounded shrink-0"
+                            >
+                              YOU
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                          <span className="text-purple-400">{contributor.role}</span>
+                          <span>•</span>
+                          <span>Active {contributor.lastActive}</span>
+                        </div>
                       </div>
                     </div>
                     <div className="text-[10px] text-muted-foreground font-mono shrink-0">
