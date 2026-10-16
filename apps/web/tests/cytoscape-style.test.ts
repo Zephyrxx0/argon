@@ -48,6 +48,17 @@ describe('Cytoscape Stylesheet', () => {
 
     const dimmedRule = stylesheet.find((r) => r.selector === 'node.dimmed');
     expect(dimmedRule?.style['opacity']).toBe(0.2);
+
+    // Live sync rules (Wave 3 - SYNC-03)
+    const pulseRule = stylesheet.find((r) => r.selector === 'node.synced-pulse');
+    expect(pulseRule).toBeDefined();
+    expect(pulseRule?.style['border-color']).toBe('#00f0ff');
+    expect(pulseRule?.style['border-width']).toBe(5);
+
+    const supersededAdrRule = stylesheet.find((r) => r.selector === 'node.superseded-adr');
+    expect(supersededAdrRule).toBeDefined();
+    expect(supersededAdrRule?.style['border-style']).toBe('dashed');
+    expect(supersededAdrRule?.style['opacity']).toBe(0.4);
   });
 });
 

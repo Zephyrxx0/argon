@@ -21,15 +21,22 @@ export function jwtAuthMiddleware(secretOverride?: string): MiddlewareHandler {
     }
 
     const authHeader = c.req.header('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const queryToken = c.req.query('token');
+    let token: string | undefined;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.slice(7).trim();
+    } else if (queryToken) {
+      token = queryToken.trim();
+    }
+
+    if (!token) {
       const errorResponse: GatewayErrorResponse = {
         error: 'Missing or malformed Authorization header',
         code: ErrorCodes.UNAUTHORIZED,
       };
       return c.json(errorResponse, 401);
     }
-
-    const token = authHeader.slice(7).trim();
 
     // Backward compatibility: static secret matching for internal dev & test harnesses
     if (token === secret) {

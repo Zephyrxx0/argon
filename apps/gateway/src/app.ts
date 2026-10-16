@@ -10,6 +10,7 @@ import { briefingRoute, type BriefingRouteOptions } from './routes/briefing.js';
 import { githubRoute, type GitHubRouteOptions } from './routes/github.js';
 import { GitHubAppService } from './services/github-app.js';
 import { webhooksRoute, type WebhooksRouteOptions } from './routes/webhooks.js';
+import { eventsRoute, type EventsRouteOptions } from './routes/events.js';
 import { IncrementalSyncService } from './services/incremental-sync.js';
 import { syncOrchestrator } from './services/sync-orchestrator.js';
 
@@ -23,6 +24,7 @@ export interface GatewayAppOptions {
   githubRouteOptions?: GitHubRouteOptions;
   webhooksOptions?: WebhooksRouteOptions;
   incrementalSyncService?: IncrementalSyncService;
+  eventsOptions?: EventsRouteOptions;
 }
 
 export function createGatewayApp(options?: GatewayAppOptions): Hono {
@@ -62,9 +64,18 @@ export function createGatewayApp(options?: GatewayAppOptions): Hono {
   });
   app.route('/api/v1/webhooks', whRoute);
 
-  // Pre-query tenant authorization guard and named query routes under /api/v1
+  // Pre-query tenant authorization guard under /api/v1
   if (options?.graphClient) {
     app.use('/api/v1/:workspaceId/*', tenantAuthMiddleware(options.graphClient));
+    app.use('/api/v1/workspaces/:workspaceId/*', tenantAuthMiddleware(options.graphClient));
+  }
+
+  // Live SSE event stream routes
+  const evRoute = eventsRoute(options?.eventsOptions);
+  app.route('/api/v1', evRoute);
+
+  // Named query routes and briefing routes under /api/v1
+  if (options?.graphClient) {
     app.route('/api/v1', queryRoute(options.graphClient, { timeoutMs: options?.queryTimeoutMs }));
     app.route('/api/v1', briefingRoute(options.graphClient, options.briefingOptions));
   }

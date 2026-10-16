@@ -9,7 +9,10 @@ import { ErrorCodes, type GatewayErrorResponse, type JwtAuthUser } from '../type
  */
 export function tenantAuthMiddleware(graphClient: ArgonGraphClient): MiddlewareHandler {
   return async (c, next) => {
-    const workspaceId = c.req.param('workspaceId') || c.req.path.split('/')[3];
+    const parts = c.req.path.split('/');
+    const workspaceId =
+      c.req.param('workspaceId') ||
+      (parts[3] === 'workspaces' ? parts[4] : parts[3]);
 
     if (!workspaceId) {
       return await next();

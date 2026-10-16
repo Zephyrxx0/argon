@@ -137,6 +137,31 @@ export function createCytoscapeStylesheet(tokens: Theme2077Tokens) {
         width: 2.5,
       },
     },
+
+    // 11. Synced Pulse Node (Wave 3 - SYNC-03)
+    {
+      selector: 'node.synced-pulse',
+      style: {
+        'border-color': tokens.accent,
+        'border-width': 5,
+        'background-color': '#003a42',
+        'z-index': 1000,
+        opacity: 1,
+        'transition-property': 'border-color, border-width, background-color, opacity',
+        'transition-duration': '1.2s',
+      },
+    },
+
+    // 12. Superseded ADR Node (Wave 3 - SYNC-03)
+    {
+      selector: 'node.superseded-adr',
+      style: {
+        opacity: 0.4,
+        'border-style': 'dashed',
+        'border-color': tokens.danger,
+        'border-width': 2,
+      },
+    },
   ];
 }
 

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import type { Core } from 'cytoscape';
 import { ZoomIn, ZoomOut, Maximize2, RefreshCw, Filter, Download } from 'lucide-react';
 import { clsx } from 'clsx';
+import { useGraphSync } from '@/lib/graph-sync';
 
 export interface HudControlsProps {
   cy: Core | null;
@@ -13,6 +14,7 @@ export interface HudControlsProps {
 
 export function HudControls({ cy, onFilterChange, className }: HudControlsProps) {
   const [filterMode, setFilterMode] = useState<'all' | 'cited-only'>('all');
+  const { syncBadgeText } = useGraphSync();
 
   const handleZoomIn = () => {
     if (!cy) return;
@@ -94,6 +96,20 @@ export function HudControls({ cy, onFilterChange, className }: HudControlsProps)
         className
       )}
     >
+      {/* Live Incremental Sync Badge (Task 08-03-03, SYNC-03) */}
+      {syncBadgeText && (
+        <>
+          <div
+            data-testid="hud-live-sync-badge"
+            className="flex items-center gap-1.5 px-2 py-1 bg-cyan-950/80 border border-cyan-500/50 text-cyan-400 text-[10px] tracking-wider animate-pulse transition-opacity duration-500"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#00e5ff]" />
+            <span>{syncBadgeText}</span>
+          </div>
+          <div className="w-[1px] h-4 bg-border mx-0.5" />
+        </>
+      )}
+
       {/* Zoom In */}
       <button
         type="button"

@@ -49,21 +49,26 @@ export function extractExplicitFiles(content: string): string[] {
   return Array.from(new Set(matches));
 }
 
+import { EventBroadcaster, eventBroadcaster } from './event-broadcaster.js';
+
 export interface IncrementalSyncServiceOptions {
   graphClient?: ArgonGraphClient;
   githubAppService?: GitHubAppService;
   embedder?: ArgonEmbedder;
+  broadcaster?: EventBroadcaster;
 }
 
 export class IncrementalSyncService {
   private graphClient?: ArgonGraphClient;
   private githubAppService: GitHubAppService;
   private embedder: ArgonEmbedder;
+  private broadcaster: EventBroadcaster;
 
   constructor(options?: IncrementalSyncServiceOptions) {
     this.graphClient = options?.graphClient;
     this.githubAppService = options?.githubAppService ?? new GitHubAppService();
     this.embedder = options?.embedder ?? new ArgonEmbedder({ provider: 'local' });
+    this.broadcaster = options?.broadcaster ?? eventBroadcaster;
   }
 
   public async processPushSync(
@@ -250,17 +255,23 @@ export class IncrementalSyncService {
     payload: any,
     workspaceId: string,
   ): Promise<IncrementalSyncResult> {
+    let result: IncrementalSyncResult;
     if (event === 'push') {
-      return await this.processPushSync(payload, workspaceId);
+      result = await this.processPushSync(payload, workspaceId);
     } else if (event === 'pull_request') {
-      return await this.processPullRequestSync(payload, workspaceId);
+      result = await this.processPullRequestSync(payload, workspaceId);
     } else {
-      return {
+      result = {
         workspaceId,
         trigger: 'push',
         updated: { commits: [], files: [], decisions: [] },
         superseded: [],
       };
     }
+
+    // Broadcast live event delta to subscribed SSE clients
+    this.broadcaster.broadcast(workspaceId, 'sync:complete', result);
+
+    return result;
   }
 }

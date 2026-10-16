@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { Briefing } from '@argon/agent';
 import { StickyJumpBar, type SectionCitationCounts } from './sticky-jump-bar';
 import { EvidenceCard } from './evidence-card';
@@ -8,6 +8,7 @@ import { KillSwitchCard } from './kill-switch-card';
 import { ForbiddenCard, NotFoundCard } from './forbidden-card';
 import { Loader2, Layers, GitFork, Users, ShieldAlert, History } from 'lucide-react';
 import { clsx } from 'clsx';
+import { useGraphSync } from '@/lib/graph-sync';
 
 export interface WebBriefingResponse {
   status:
@@ -36,6 +37,8 @@ export interface BriefingViewProps {
   isLoading?: boolean;
   onRetryConnection?: () => void;
   onSelectWorkspace?: (workspaceId: string) => void;
+  onReRunBriefing?: () => void;
+  onRefreshBriefing?: () => void;
   className?: string;
 }
 
@@ -44,6 +47,8 @@ export function BriefingView({
   isLoading = false,
   onRetryConnection,
   onSelectWorkspace,
+  onReRunBriefing,
+  onRefreshBriefing,
   className,
 }: BriefingViewProps) {
   // 1. Loading Skeleton State
@@ -117,6 +122,55 @@ export function BriefingView({
   }
 
   const briefing = response?.briefing;
+  const { lastSyncEvent } = useGraphSync();
+  const handleReRun = onReRunBriefing ?? onRefreshBriefing;
+
+  const allCitedIds = useMemo(() => {
+    if (!briefing) return [];
+    const ids = new Set<string>();
+    if (response?.evidence?.verifiedNodeIds) {
+      for (const id of response.evidence.verifiedNodeIds) ids.add(id);
+    }
+    for (const t of briefing.summary?.keyTakeaways || []) {
+      for (const id of t.citedNodeIds || []) ids.add(id);
+    }
+    for (const c of briefing.blastRadius?.affectedComponents || []) {
+      for (const id of c.citedNodeIds || []) ids.add(id);
+    }
+    for (const o of briefing.keyOwners || []) {
+      for (const id of o.citedNodeIds || []) ids.add(id);
+    }
+    for (const d of briefing.constrainingDecisions || []) {
+      for (const id of d.citedNodeIds || []) ids.add(id);
+    }
+    for (const p of briefing.precedents || []) {
+      for (const id of p.citedNodeIds || []) ids.add(id);
+    }
+    return Array.from(ids);
+  }, [briefing, response?.evidence?.verifiedNodeIds]);
+
+  const isStale = useMemo(() => {
+    if (!lastSyncEvent || allCitedIds.length === 0) return false;
+    const updatedFiles = new Set(lastSyncEvent.updated.files);
+    const updatedDecisions = new Set(lastSyncEvent.updated.decisions);
+    const supersededDecisions = new Set(lastSyncEvent.superseded);
+
+    for (const id of allCitedIds) {
+      const cleanId = id.replace(/^(f:|file:|d:|dec:|cm:|commit:)/, '');
+      if (
+        updatedFiles.has(id) ||
+        updatedFiles.has(cleanId) ||
+        updatedDecisions.has(id) ||
+        updatedDecisions.has(cleanId) ||
+        supersededDecisions.has(id) ||
+        supersededDecisions.has(cleanId)
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }, [lastSyncEvent, allCitedIds]);
+
   if (!briefing) return null;
 
   // Calculate section citation badge counts
@@ -154,6 +208,29 @@ export function BriefingView({
       data-testid="briefing-view"
       className={clsx('flex flex-col font-mono max-w-4xl mx-auto pb-16 relative', className)}
     >
+      {/* Stale Briefing Warning Banner (Task 08-03-03, SYNC-03) */}
+      {isStale && (
+        <div
+          data-testid="briefing-stale-alert"
+          className="mx-4 sm:mx-6 mt-4 p-3 border border-amber-500/70 bg-amber-950/40 text-amber-300 text-xs flex flex-wrap items-center justify-between gap-2 shadow-lg"
+        >
+          <div className="flex items-center gap-2 font-mono">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shadow-[0_0_8px_#fbbf24]" />
+            <span>Repository updated since briefing was generated. Citations may be stale.</span>
+          </div>
+          {handleReRun && (
+            <button
+              type="button"
+              onClick={handleReRun}
+              data-testid="briefing-rerun-btn"
+              className="px-2.5 py-1 text-[11px] font-bold border border-amber-500/80 bg-amber-900/60 hover:bg-amber-800 text-amber-200 transition-colors uppercase tracking-wider cursor-pointer"
+            >
+              [Re-Run Briefing]
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Sticky Section Jump Bar */}
       <StickyJumpBar counts={counts} />
 

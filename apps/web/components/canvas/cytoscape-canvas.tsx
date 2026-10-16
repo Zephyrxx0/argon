@@ -62,7 +62,7 @@ export function CytoscapeCanvas({
   const animatorRef = useRef<AnimatorHandle | null>(null);
 
   const [inspectedNode, setInspectedNode] = useState<InspectedNode | null>(null);
-  const { hoveredNodeId, focusRequest, setSelectedNode } = useGraphSync();
+  const { hoveredNodeId, focusRequest, setSelectedNode, lastSyncEvent } = useGraphSync();
 
   // Bound elements to 150 items max (Decision D-16)
   const activeElements = elements ?? DEFAULT_SHOWCASE_GRAPH;
@@ -208,6 +208,50 @@ export function CytoscapeCanvas({
       });
     }
   }, [focusRequest]);
+
+  // Handle Live Incremental Sync Pulse & ADR Supersession (Task 08-03-02, SYNC-03)
+  useEffect(() => {
+    const cy = cyInstanceRef.current;
+    if (!cy || !lastSyncEvent) return;
+
+    // 1. Mark superseded decision nodes with dashed dimmed styling
+    for (const supersededId of lastSyncEvent.superseded) {
+      const candidates = [supersededId, `d:${supersededId}`, `dec:${supersededId}`];
+      for (const id of candidates) {
+        const node = cy.getElementById(id);
+        if (node && node.length > 0) {
+          node.addClass('superseded-adr');
+        }
+      }
+    }
+
+    // 2. Collect all updated node IDs
+    const candidateIds = [
+      ...lastSyncEvent.updated.commits.flatMap((c) => [c, `cm:${c}`, `commit:${c}`]),
+      ...lastSyncEvent.updated.files.flatMap((f) => [f, `f:${f}`, `file:${f}`]),
+      ...lastSyncEvent.updated.decisions.flatMap((d) => [d, `d:${d}`, `dec:${d}`]),
+    ];
+
+    // 3. Highlight updated nodes with .synced-pulse class
+    const pulsedNodes: any[] = [];
+    for (const id of candidateIds) {
+      const node = cy.getElementById(id);
+      if (node && node.length > 0) {
+        node.addClass('synced-pulse');
+        pulsedNodes.push(node);
+      }
+    }
+
+    // 4. Auto-remove pulse class after animation duration
+    if (pulsedNodes.length > 0) {
+      const timer = setTimeout(() => {
+        for (const n of pulsedNodes) {
+          n.removeClass('synced-pulse');
+        }
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [lastSyncEvent]);
 
   return (
     <div className={clsx('relative w-full h-full font-mono bg-card overflow-hidden', className)}>
