@@ -1,7 +1,7 @@
 # Stack Research: Milestone v2.0
 
 **Domain:** Authentication, Multi-Tenant Graph Authorization & Webhook Ingestion  
-**Researched:** 2026-10-16  
+**Researched:** 2026-10-16 (Updated for Better Auth)  
 **Confidence:** HIGH  
 
 ## Recommended Stack
@@ -10,7 +10,7 @@
 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| `next-auth` (Auth.js) | `^5.0.0-beta.25` | GitHub App OAuth & Session Management in `apps/web` | Battle-tested JWT session strategy requires zero database adapters (preserving FalkorDB as sole datastore), native Next.js 15 App Router & React 19 compatibility. |
+| `better-auth` | `^1.1.0` | GitHub OAuth & Stateless Guest Session Management in `apps/web` | Official modern TypeScript-first auth framework with first-class `anonymous()` plugin, full Next.js 15 & React 19 support, and stateless cookie operation (`storeStateStrategy: "cookie"`, `storeAccountCookie: true`) without requiring an external database adapter (preserving FalkorDB as sole datastore). |
 | `@octokit/auth-app` | `^7.1.0` | GitHub App Installation Token Generation | Official Octokit library for signing RS256 JWTs and obtaining short-lived (1-hour) installation access tokens (`ghs_...`) for private repository ingestion. |
 | `@octokit/rest` | `^21.0.0` | GitHub REST API Client | Lightweight client for querying user installations (`GET /user/installations`) and accessible repositories (`GET /installation/repositories`). |
 | Node.js `crypto` | Built-in | Webhook HMAC-SHA256 Signature Verification | Native, zero-dependency `crypto.createHmac` + `crypto.timingSafeEqual` prevents timing attack vulnerabilities on GitHub webhooks. |
@@ -25,28 +25,20 @@
 
 ---
 
-## Guest User Architecture & Evaluation
+## Guest User Architecture & Better Auth Evaluation
 
 A critical requirement for Argon is supporting **Guest Users** alongside authenticated GitHub users.
 
-### Evaluation of Options:
+### Selected Architecture: Better Auth with `anonymous()` in Stateless Cookie Mode
 
-1. **Option A: NextAuth v5 (Dual-Mode: Null Session as Guest) [RECOMMENDED]**
-   - **How it works:** When a visitor lands on Argon, `session` is `null`. They are seamlessly treated as a Guest. All public showcase workspaces (`ember-adr-showcase`, `argo-cd`, etc.) are flagged with `is_public: true` or `owner: null` and require no authentication. If a guest wants to ingest an ephemeral public repo, they can do so under a guest workspace ID. When they click "Connect GitHub", NextAuth signs them in, binds their GitHub identity, and grants access to their private repositories.
-   - **Database impact:** Zero database overhead. No adapter needed.
-   - **DX:** Standard Next.js idiom; zero latency on landing page.
-
-2. **Option B: NextAuth v5 with Custom Anonymous Credentials Provider**
-   - **How it works:** A custom `CredentialsProvider({ id: "anonymous", ... })` generates an ephemeral JWT session for anonymous guests upon clicking "Continue as Guest".
-   - **Tradeoff:** Adds cookie state and client redirect overhead for guests who simply want to read showcase graphs.
-
-3. **Option C: Better Auth with `anonymous()` plugin**
-   - **How it works:** Better Auth has a dedicated `anonymous()` plugin that automatically converts guest accounts into authenticated users on OAuth sign-in.
-   - **Why NOT chosen:** Better Auth strictly requires a relational SQL database adapter (Prisma, Drizzle, Kysely for Postgres/MySQL/SQLite) or MongoDB adapter. Argon has a hard project constraint: **FalkorDB is the primary and only database (no secondary Postgres/Firestore/Mongo datastore)**. Implementing and maintaining a full openCypher database adapter for Better Auth is outside project scope.
-
-4. **Option D: Custom Session Handling (`jose` + Next.js Route Handlers)**
-   - **How it works:** Manual GitHub OAuth handshake and custom signed JWT cookies.
-   - **Tradeoff:** Requires custom CSRF state tokens, PKCE, and cookie rotation logic that NextAuth v5 already provides securely.
+- **How it works:** 
+  1. `betterAuth()` is initialized **without a database adapter**.
+  2. `storeStateStrategy: "cookie"` stores OAuth state payloads in encrypted cookies.
+  3. `storeAccountCookie: true` stores provider token and profile data in encrypted cookies.
+  4. The `anonymous()` plugin (`better-auth/plugins`) provides native guest sessions. Guests can click "Continue as Guest" or automatically browse with an anonymous ID via `authClient.signIn.anonymous()`.
+  5. When a guest user decides to log in via GitHub, Better Auth's `onLinkAccount` callback automatically links their temporary session to their authenticated GitHub account.
+- **Database impact:** Zero database overhead. Does not require Prisma, Drizzle, or PostgreSQL, strictly honoring our rule that FalkorDB is the sole datastore.
+- **Next.js 15 / React 19:** Clean client hooks (`useSession()`, `authClient.signIn.social({ provider: "github" })`) with zero React 19 hydration issues.
 
 ---
 
@@ -54,7 +46,7 @@ A critical requirement for Argon is supporting **Guest Users** alongside authent
 
 ```bash
 # In apps/web
-pnpm --filter web add next-auth@beta @octokit/auth-app @octokit/rest
+pnpm --filter web add better-auth @octokit/auth-app @octokit/rest
 
 # In apps/gateway
 pnpm --filter @argon/gateway add jose
@@ -67,17 +59,14 @@ pnpm --filter @argon/ingest add @octokit/auth-app
 
 ## Alternatives Considered
 
-| Recommended | Alternative | When to Use Alternative |
-|-------------|-------------|-------------------------|
-| NextAuth v5 (Auth.js) | Better Auth | If the project already uses PostgreSQL or MySQL with Prisma/Drizzle. |
-| Dual-Mode (Null as Guest) | Forced Anonymous Session | If server-side cart/draft state must be stored across distinct subdomains before login. |
-| Octokit Auth App | Raw `fetch` + `crypto` RS256 | If zero-dependency binary size is critical (Octokit handles token caching and refresh automatically). |
+| Recommended | Alternative | Why Better Auth Was Chosen |
+|-------------|-------------|----------------------------|
+| Better Auth (Stateless + Anonymous plugin) | NextAuth (Auth.js v5) | NextAuth v5 lacks a native anonymous user plugin and is still in beta with React 19 hydration friction. The Better Auth team maintains Auth.js as well, but Better Auth offers cleaner TypeScript DX and out-of-the-box guest account linking. |
+| Stateless Cookie Cache | Prisma / PostgreSQL Adapter | Argon's core constraint requires FalkorDB as the only database. Stateless cookie sessions eliminate RDBMS dependencies entirely. |
 
 ---
 
 ## What NOT to Use
 
-- **Do NOT use Prisma / Drizzle / PostgreSQL**: Argon relies strictly on FalkorDB. NextAuth must be used in stateless JWT mode (`session: { strategy: "jwt" }`).
-- **Do NOT use Lucia Auth**: Lucia is officially deprecated.
+- **Do NOT use Prisma / Drizzle / PostgreSQL**: Argon relies strictly on FalkorDB. Better Auth must be configured in stateless mode.
 - **Do NOT store GitHub App private keys or installation tokens in FalkorDB**: Private keys live strictly in environment variables; installation tokens are ephemeral and generated on demand in memory.
-

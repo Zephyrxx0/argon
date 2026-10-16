@@ -9,8 +9,8 @@ Requirements for Milestone v2.0 release. Each maps to roadmap phases.
 
 ### Authentication & Identity
 
-- [ ] **AUTH-01**: User can authenticate via GitHub App OAuth using NextAuth v5 in `apps/web` with secure HTTP-only JWT sessions and view their profile in HeaderBar.
-- [ ] **AUTH-02**: Unauthenticated guests can seamlessly browse public showcase workspaces and run graph queries without forced login or redirect loops.
+- [ ] **AUTH-01**: User can authenticate via GitHub OAuth using Better Auth in `apps/web` with stateless encrypted session cookies and view their profile in HeaderBar.
+- [ ] **AUTH-02**: Unauthenticated guests can seamlessly browse public showcase workspaces and run graph queries using Better Auth's `anonymous()` plugin without forced login or redirect loops.
 
 ### Multi-Tenant Graph Authorization
 

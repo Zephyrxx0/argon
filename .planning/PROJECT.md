@@ -13,7 +13,7 @@ Every briefing claim is mathematically grounded in and computed by the FalkorDB 
 **Goal:** Upgrade Argon into an authenticated, multi-tenant project-memory system supporting private repositories and real-time webhook-driven incremental graph synchronization.
 
 **Target features:**
-- GitHub App authentication & HTTP-only JWT session management in `apps/web` (AUTH-01)
+- GitHub OAuth authentication & stateless session management with anonymous guest support via Better Auth in `apps/web` (AUTH-01)
 - Multi-tenant graph workspace authorization and gateway access verification in FalkorDB (AUTH-02)
 - Authenticated shallow git ingestion with secret token redaction and repository selector (ING-04)
 - Webhook listener and incremental graph synchronization pipeline for push and PR events (SYNC-01)
@@ -32,23 +32,11 @@ Every briefing claim is mathematically grounded in and computed by the FalkorDB 
 - [x] **CITE-01**: Strict citation integrity post-check verifying all cited node IDs against FalkorDB before presenting to the user. — *Phase 03*
 - [x] **WS-01**: Guest-first workspaces supporting arbitrary git repositories without mandatory login. — *Phase 04*
 - [x] **UI-01**: Command bar interface, brutalist evidence cards (2077 tweakcn theme), and Cytoscape.js traversal canvas (in-memory layout). — *Phase 04*
-- [x] **GRAPH-01**: FalkorDB graph schema, constraints, vector index, and 8 parameterized named queries executed exclusively via `GRAPH.RO_QUERY`. — *Phase 01 (v1.0)*
-- [x] **EMB-01**: Embedding generation using EmbeddingGemma-2 (`q8`, 512-d) on Node.js CPU via Transformers.js with L2-normalized MRL truncation. — *Phase 01 (v1.0)*
-- [x] **ING-01**: Tier 0 ingestion extracting commits, authors, file touches, co-change coupling, and `REVERTS` relationships. — *Phase 02 (v1.0)*
-- [x] **DEC-01**: Structured decision extraction from markdown ADRs/RFCs and commit messages with supersession windows (`valid_from`, `valid_to`). — *Phase 02 (v1.0)*
-- [x] **JOB-01**: Pure FalkorDB `IngestJob` node state tracking and background worker polling without external queue dependencies. — *Phase 02 (v1.0)*
-- [x] **GW-01**: Cloud Run read-only query gateway with Direct VPC egress to FalkorDB on Compute Engine (ports closed to public). — *Phase 03 (v1.0)*
-- [x] **BRIEF-01**: Parallel query retrieval pipeline followed by single-call Gemma 4 narration with strict Zod schema validation and retry loop. — *Phase 03 (v1.0)*
-- [x] **CITE-01**: Strict citation integrity post-check verifying all cited node IDs against FalkorDB before presenting to the user. — *Phase 03 (v1.0)*
-- [x] **WS-01**: Guest-first workspaces supporting arbitrary git repositories without mandatory login. — *Phase 04 (v1.0)*
-- [x] **UI-01**: Command bar interface, brutalist evidence cards (2077 tweakcn theme), and Cytoscape.js traversal canvas (in-memory layout). — *Phase 04 (v1.0)*
-- [x] **EVAL-01**: Historical revert backtest runner with `asOf` date rewinding and no-graph baseline comparison. — *Phase 05 (v1.0)*
 - [x] **EVAL-01**: Historical revert backtest runner with `asOf` date rewinding and no-graph baseline comparison. — *Phase 05*
 
-### Active (Milestone v2.0 Candidate Scope)
 ### Active
 
-- [ ] **AUTH-01**: GitHub App OAuth authentication & session management in `apps/web`.
+- [ ] **AUTH-01**: GitHub OAuth authentication & stateless session management via Better Auth in `apps/web`.
 - [ ] **AUTH-02**: Multi-tenant workspace authorization in FalkorDB (`:User`, `[:ACCESSES]`) & gateway security gate.
 - [ ] **ING-04**: Authenticated shallow git clones with short-lived installation tokens & credential-redacting logs.
 - [ ] **SYNC-01**: Webhook listener service processing `push` and `pull_request` events for incremental graph updates.

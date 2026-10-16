@@ -18,7 +18,7 @@ Phase 6: Authentication & Multi-Tenant Authorization (AUTH-01, AUTH-02, TENANT-0
 
 ## Phases
 
-- [ ] **Phase 6: Authentication & Multi-Tenant Authorization** — NextAuth v5 GitHub OAuth integration, guest-safe sessions, and FalkorDB graph multi-tenancy.
+- [ ] **Phase 6: Authentication & Multi-Tenant Authorization** — Better Auth GitHub OAuth integration with anonymous guest plugin, stateless cookie sessions, and FalkorDB graph multi-tenancy.
 - [ ] **Phase 7: Authenticated Ingestion & Private Repo Selector** — GitHub App installation token generation, secret-scrubbed shallow cloning, and private repository selector.
 - [ ] **Phase 8: Webhook Receiver & Incremental Sync Engine** — HMAC-verified webhook handler, incremental commit/touch updates, ADR temporal validity advancement, and live sync pulse.
 
@@ -28,12 +28,12 @@ Phase 6: Authentication & Multi-Tenant Authorization (AUTH-01, AUTH-02, TENANT-0
 
 ### Phase 6: Authentication & Multi-Tenant Authorization
 
-**Goal**: Implement GitHub App authentication via NextAuth v5 in `apps/web` with guest-safe stateless JWT sessions, extend FalkorDB openCypher schema with `:User` / `[:ACCESSES]` nodes, and enforce tenant authorization gates in `apps/gateway`.
+**Goal**: Implement GitHub OAuth authentication via Better Auth in `apps/web` with guest-safe stateless cookie sessions and the `anonymous()` plugin, extend FalkorDB openCypher schema with `:User` / `[:ACCESSES]` nodes, and enforce tenant authorization gates in `apps/gateway`.
 **Depends on**: v1.0 foundation (Phases 1-5)
 **Requirements**: AUTH-01, AUTH-02, TENANT-01
 **Success Criteria** (what must be TRUE):
-  1. User can sign in with GitHub via NextAuth v5 and view their user avatar, name, and sign-out controls in `HeaderBar`, with session persisting across browser refreshes.
-  2. Unauthenticated visitors can browse public showcase workspaces and run graph queries without forced login prompts or redirect loops.
+  1. User can sign in with GitHub via Better Auth and view their user avatar, name, and sign-out controls in `HeaderBar`, with session persisting across browser refreshes.
+  2. Unauthenticated visitors can browse public showcase workspaces and run graph queries via Better Auth's `anonymous()` plugin without forced login prompts or redirect loops.
   3. FalkorDB schema enforces `(:User)-[:ACCESSES]->(:Workspace)` constraints and gateway rejects unauthorized query access to private workspaces with `403 Forbidden`.
 **Plans**: 3 plans (TBD during Phase 6 planning)
 

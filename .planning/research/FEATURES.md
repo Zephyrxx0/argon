@@ -9,10 +9,10 @@
 ### 1. Authentication & Identity (`AUTH-01`)
 
 **Must have (table stakes):**
-- **GitHub App OAuth Login:** Standard NextAuth v5 GitHub sign-in button in HeaderBar with user avatar and sign-out menu.
-- **Stateless Secure JWT Session:** HTTP-only, SameSite cookie storing user ID (`github_id`), handle, name, and avatar.
-- **Guest Mode Preservation:** First-class unauthenticated experience. Guests can freely inspect showcase graphs (`ember-adr-showcase`, `argo-cd`) and trigger read-only briefings without prompt or blocker.
-- **Guest Ingestion:** Guests can clone public repositories anonymously into ephemeral guest workspaces.
+- **GitHub OAuth Login with Better Auth:** GitHub sign-in button in HeaderBar with user avatar and sign-out menu via Better Auth client.
+- **Stateless Secure Cookie Sessions:** HTTP-only, encrypted cookie storing user ID (`github_id`), handle, name, and avatar without database lookup.
+- **First-Class Guest Mode with Anonymous Plugin:** Guests can freely inspect showcase graphs (`ember-adr-showcase`, `argo-cd`) and trigger read-only briefings without prompt or blocker, backed by Better Auth's `anonymous()` plugin.
+- **Guest Ingestion & Account Linking:** Guests can clone public repositories anonymously into ephemeral guest workspaces, with `onLinkAccount` automatically preserving their workspace access upon GitHub login.
 
 **Should have (differentiators):**
 - **Automatic Person Linking:** Link authenticated GitHub user identity to mined `(:Person)` nodes in the repository's commit graph.

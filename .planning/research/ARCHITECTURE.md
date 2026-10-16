@@ -9,13 +9,13 @@
 ```
 [ Developer Browser / Client ]
              │
-             ├── (1) Browse / Public Showcase (Guest: No Cookie, w.is_public=true)
-             ├── (2) OAuth Sign-in -> /api/auth/callback/github (NextAuth v5 JWT)
+             ├── (1) Browse / Public Showcase (Guest: Better Auth anonymous plugin)
+             ├── (2) OAuth Sign-in -> /api/auth/[...all] (Better Auth Stateless Cookie)
              │
              ▼
      [ apps/web (Next.js 15) ]
              │
-             ├── Authenticated JWT Session
+             ├── Authenticated / Anonymous Session via Better Auth
              ├── Octokit App Token Exchange (for Private Repos)
              │
              ├── Gateway Query Request (Bearer Token + X-User-Id header or Signed JWT)
@@ -39,8 +39,9 @@
 
 ### 1. `apps/web` (Next.js 15 App Router)
 - **Auth Layer:**
-  - `auth.ts`: Configures `NextAuth` with GitHub Provider and `strategy: "jwt"`.
-  - `components/auth/session-provider.tsx`: `"use client"` wrapper around NextAuth's `SessionProvider`.
+  - `lib/auth.ts`: Configures `betterAuth` with GitHub Social Provider and `anonymous()` plugin in stateless cookie mode (`storeStateStrategy: "cookie"`, `storeAccountCookie: true`).
+  - `lib/auth-client.ts`: Exports `createAuthClient` with `anonymousClient()` plugin for React components.
+  - `app/api/auth/[...all]/route.ts`: Exposes Better Auth handler (`toNextJsHandler(auth.handler)`).
   - `components/navigation/header-bar.tsx`: Displays user avatar, login/logout controls, or "GUEST // 2077" badge.
 - **Repository Selector:**
   - `components/workspace/repo-picker-modal.tsx`: Queries authorized GitHub App installations for available private/public repos.
