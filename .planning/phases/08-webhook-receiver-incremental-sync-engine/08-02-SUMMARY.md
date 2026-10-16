@@ -1,3 +1,9 @@
+---
+requirements-completed:
+  - SYNC-02
+  - SYNC-03
+---
+
 # Plan 08-02 Summary: Incremental Git Mutation, Rolling Co-Change & ADR Supersession Engine
 
 **Execution Wave:** Wave 2  
@@ -57,3 +63,4 @@
 - Implement web client listener (`apps/web/lib/events-client.ts`, `apps/web/lib/graph-sync.tsx`).
 - Add Cytoscape canvas pulse animation for synced nodes and dashed border style for superseded ADR nodes.
 - Add HUD sync badge and active briefing stale alert banner.
+

@@ -1,3 +1,8 @@
+---
+requirements-completed:
+  - SYNC-01
+---
+
 # Plan 08-01: Summary
 
 **Plan:** 08-01 — HMAC-Verified Webhook Listener & Async Ingestion Job Engine  
@@ -43,3 +48,4 @@ pnpm --filter @argon/gateway test
 - **T-08-02 (Information Disclosure / Timing Attack):** Implemented `crypto.timingSafeEqual`.
 - **T-08-03 (Replay / DoS):** In-memory LRU delivery deduplication returning 200 `{ deduplicated: true }`.
 - **T-08-04 (Timeout DoS):** Immediate 202 Accepted response with decoupled async background execution.
+

@@ -1,3 +1,8 @@
+---
+requirements-completed:
+  - SYNC-03
+---
+
 # Plan 08-03 Summary: Real-Time SSE Stream, Cytoscape Neon Sync Pulse & UI Invalidation
 
 **Execution Wave:** Wave 3  
@@ -58,3 +63,4 @@
 - `web`: 20 test suites, 86/86 tests passing (`pnpm --filter web test`).
 - Workspace-wide (`pnpm test`): 9 out of 9 workspace projects passing, 100% green.
 - Typecheck: `tsc --noEmit` cleanly passing across gateway and web.
+

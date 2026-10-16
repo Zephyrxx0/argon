@@ -15,18 +15,18 @@ Requirements for Milestone v2.0 release. Each maps to roadmap phases.
 ### Multi-Tenant Graph Authorization
 
 - [x] **TENANT-01**: User can have their workspace access securely isolated in FalkorDB via `(:User)-[:ACCESSES]->(:Workspace)` edges, verified by the gateway before executing named queries.
-- [ ] **TENANT-02**: User can link their authenticated GitHub identity to mined `(:Person)` graph nodes in the repository commit graph.
+- [x] **TENANT-02**: User can link their authenticated GitHub identity to mined `(:Person)` graph nodes in the repository commit graph.
 
 ### Authenticated Ingestion & Secret Redaction
 
-- [ ] **ING-04**: User can select repositories from their authorized GitHub App installations via a searchable dropdown and trigger authenticated shallow git clones using short-lived installation tokens.
-- [ ] **ING-05**: System redacts all installation tokens and credentials from git stdout/stderr, logs, and FalkorDB `(:IngestJob)` error properties.
+- [x] **ING-04**: User can select repositories from their authorized GitHub App installations via a searchable dropdown and trigger authenticated shallow git clones using short-lived installation tokens.
+- [x] **ING-05**: System redacts all installation tokens and credentials from git stdout/stderr, logs, and FalkorDB `(:IngestJob)` error properties.
 
 ### Webhook & Incremental Graph Sync
 
-- [ ] **SYNC-01**: Gateway can receive and verify GitHub webhook payloads (`push`, `pull_request`) using timing-safe HMAC-SHA256 signature verification.
-- [ ] **SYNC-02**: System incrementally updates `(:Commit)`, `(:File)`, and `[:TOUCHES]` nodes on push events without performing a full repository re-clone.
-- [ ] **SYNC-03**: System detects merged pull requests, updates `(:Decision)` supersession validity windows (`valid_to`), and triggers a live visual sync pulse on the Cytoscape canvas.
+- [x] **SYNC-01**: Gateway can receive and verify GitHub webhook payloads (`push`, `pull_request`) using timing-safe HMAC-SHA256 signature verification.
+- [x] **SYNC-02**: System incrementally updates `(:Commit)`, `(:File)`, and `[:TOUCHES]` nodes on push events without performing a full repository re-clone.
+- [x] **SYNC-03**: System detects merged pull requests, updates `(:Decision)` supersession validity windows (`valid_to`), and triggers a live visual sync pulse on the Cytoscape canvas.
 
 ## Future Requirements (v3.0)
 
@@ -52,9 +52,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTH-01 | Phase 06 | Complete |
 | AUTH-02 | Phase 06 | Complete |
 | TENANT-01 | Phase 06 | Complete |
-| TENANT-02 | Phase 07 | Pending |
-| ING-04 | Phase 07 | Pending |
-| ING-05 | Phase 07 | Pending |
-| SYNC-01 | Phase 08 | Pending |
-| SYNC-02 | Phase 08 | Pending |
-| SYNC-03 | Phase 08 | Pending |
+| TENANT-02 | Phase 07 | Complete |
+| ING-04 | Phase 07 | Complete |
+| ING-05 | Phase 07 | Complete |
+| SYNC-01 | Phase 08 | Complete |
+| SYNC-02 | Phase 08 | Complete |
+| SYNC-03 | Phase 08 | Complete |
