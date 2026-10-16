@@ -2,60 +2,58 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: GitHub App Integration & Incremental Sync
-status: planning
-last_updated: "2026-10-16T05:33:53.530Z"
+status: ready
+stopped_at: Milestone v2.0 initialized
+last_updated: "2026-10-16T05:42:00.000Z"
 last_activity: 2026-10-16
+last_activity_desc: Milestone v2.0 started, requirements and roadmap defined
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
   percent: 0
+current_phase: 6
+current_phase_name: authentication-multi-tenant-authorization
 ---
 
 # State: Argon
 
-**Last Updated:** 2026-10-15  
-**Current Milestone:** v1.0 MVP  
-**Current Phase:** 5
-**Phase Status:** Completed (4/4 plans completed)  
-**Total Plans in Phase:** 4
-**Plans Completed:** 4  
+**Last Updated:** 2026-10-16  
+**Current Milestone:** v2.0 GitHub App Integration & Incremental Sync  
+**Current Phase:** Phase 6 — Authentication & Multi-Tenant Authorization  
+**Phase Status:** Ready to plan  
+**Total Plans in Phase:** TBD (to be planned via `/gsd-plan-phase 6`)  
+**Plans Completed:** 0  
 
 ## Project Reference
 
 See: [.planning/PROJECT.md](file:///home/zeph/Code/argon/.planning/PROJECT.md) (initialized 2026-10-15)
 
 **Core value:** Every briefing claim is mathematically grounded in and computed by the FalkorDB knowledge graph (traversals, PageRank/centrality, temporal predicates, and vector search) with 100% citation integrity—"no graph, no answer."  
-**Current focus:** Phase 5 — revert-backtest-showcase-corpus
+**Current focus:** Phase 6 — Authentication & Multi-Tenant Authorization
 
 ## Progress Summary
 
 | Phase | Description | Status |
 |---|---|---|
-| **Phase 1** | Database Schema & Vector Foundation | 🟢 Completed (4/4 plans completed) |
-| **Phase 2** | Ingestion Pipeline & Decision Mining | 🟢 Completed (4/4 plans completed) |
-| **Phase 3** | Query Gateway & Briefing Pipeline | 🟢 Completed (4/4 plans completed) |
-| **Phase 4** | Next.js Frontend & Graph Canvas | 🟢 Completed (4/4 plans completed) |
-| **Phase 5** | Revert Backtest & Showcase Corpus | 🟢 Completed (4/4 plans completed) |
+| **Phase 6** | Authentication & Multi-Tenant Authorization | ⚪ Ready to plan |
+| **Phase 7** | Authenticated Ingestion & Private Repo Selector | ⚪ Pending |
+| **Phase 8** | Webhook Receiver & Incremental Sync Engine | ⚪ Pending |
 
 ## Next Action
 
-Milestone v1.0 MVP complete and archived. Candidate specification for Milestone v2.0 (GitHub App Integration & Webhook Sync) authored in `.planning/v2.0-MILESTONE-SPEC.md`. Ready to initialize Milestone v2.0 via `/gsd-new-milestone`.
-
-## Session
-
-**Last session:** 2026-10-15T18:41:15.593Z
-**Stopped at:** Phase 5 context gathered
-**Resume file:** .planning/phases/05-revert-backtest-showcase-corpus/05-CONTEXT.md
+Milestone v2.0 initialized. Ready to discuss or plan Phase 6:
+`/gsd-discuss-phase 6` or `/gsd-plan-phase 6`
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: Phase 6 — Authentication & Multi-Tenant Authorization
 Plan: —
-Status: Defining requirements
-Last activity: 2026-10-16 — Milestone v2.0 started
+Status: Ready to plan
+Last activity: 2026-10-16 — Milestone v2.0 initialized
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- `/gsd-discuss-phase 6` — gather context and clarify approach
+- `/gsd-plan-phase 6` — create execution plans for Phase 6

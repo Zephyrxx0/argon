@@ -1,109 +1,77 @@
 # Roadmap: Argon
 
-**Milestone:** v1.0 MVP (Hackathon Target)  
+**Milestone:** v2.0 GitHub App Integration & Incremental Sync  
 **Core Value:** Every briefing claim is mathematically grounded in and computed by the FalkorDB knowledge graph (traversals, PageRank/centrality, temporal predicates, and vector search) with 100% citation integrity—"no graph, no answer."
+
 ## Milestones
 
----
 - ✅ **v1.0 MVP** — Phases 1-5 (shipped 2026-10-16) — [.planning/milestones/v1.0-ROADMAP.md](file:///home/zeph/Code/argon/.planning/milestones/v1.0-ROADMAP.md)
+- 🟡 **v2.0 GitHub App Integration & Incremental Sync** — Phases 6-8 (in planning)
 
 ## Phase Overview
-## Phases
 
 ```
-Phase 1: Database Schema & Vector Foundation
-  └── Phase 2: Ingestion Pipeline & Decision Mining
-        └── Phase 3: Query Gateway & Briefing Pipeline
-              └── Phase 4: Next.js Frontend & Graph Canvas
-                    └── Phase 5: Revert Backtest & Showcase Corpus
+Phase 6: Authentication & Multi-Tenant Authorization (AUTH-01, AUTH-02, TENANT-01)
+  └── Phase 7: Authenticated Ingestion & Private Repo Selector (TENANT-02, ING-04, ING-05)
+        └── Phase 8: Webhook Receiver & Incremental Sync Engine (SYNC-01, SYNC-02, SYNC-03)
 ```
+
+## Phases
+
+- [ ] **Phase 6: Authentication & Multi-Tenant Authorization** — NextAuth v5 GitHub OAuth integration, guest-safe sessions, and FalkorDB graph multi-tenancy.
+- [ ] **Phase 7: Authenticated Ingestion & Private Repo Selector** — GitHub App installation token generation, secret-scrubbed shallow cloning, and private repository selector.
+- [ ] **Phase 8: Webhook Receiver & Incremental Sync Engine** — HMAC-verified webhook handler, incremental commit/touch updates, ADR temporal validity advancement, and live sync pulse.
+
+---
+
+## Phase Details
+
+### Phase 6: Authentication & Multi-Tenant Authorization
+
+**Goal**: Implement GitHub App authentication via NextAuth v5 in `apps/web` with guest-safe stateless JWT sessions, extend FalkorDB openCypher schema with `:User` / `[:ACCESSES]` nodes, and enforce tenant authorization gates in `apps/gateway`.
+**Depends on**: v1.0 foundation (Phases 1-5)
+**Requirements**: AUTH-01, AUTH-02, TENANT-01
+**Success Criteria** (what must be TRUE):
+  1. User can sign in with GitHub via NextAuth v5 and view their user avatar, name, and sign-out controls in `HeaderBar`, with session persisting across browser refreshes.
+  2. Unauthenticated visitors can browse public showcase workspaces and run graph queries without forced login prompts or redirect loops.
+  3. FalkorDB schema enforces `(:User)-[:ACCESSES]->(:Workspace)` constraints and gateway rejects unauthorized query access to private workspaces with `403 Forbidden`.
+**Plans**: 3 plans (TBD during Phase 6 planning)
+
+---
+
+### Phase 7: Authenticated Ingestion & Private Repo Selector
+
+**Goal**: Implement short-lived GitHub App installation token generation, authenticated shallow git clone with strict secret redaction, and a searchable repository picker dialog in `apps/web`.
+**Depends on**: Phase 6
+**Requirements**: TENANT-02, ING-04, ING-05
+**Success Criteria** (what must be TRUE):
+  1. Authenticated user can view and search their authorized GitHub repositories in a modal dialog instead of manually typing clone URLs.
+  2. Ingestion engine successfully clones a private repository using short-lived installation tokens without writing tokens to logs, stdout/stderr, or `(:IngestJob.error)`.
+  3. Mined commits link commit author identities to graph `(:Person)` nodes matching authenticated user profiles.
+**Plans**: 3 plans (TBD during Phase 7 planning)
+
+---
+
+### Phase 8: Webhook Receiver & Incremental Sync Engine
+
+**Goal**: Implement HMAC-verified GitHub webhook listener in `apps/gateway`, incremental commit/touch/coupling updates, ADR temporal validity window advancement, and Cytoscape canvas live sync feedback.
+**Depends on**: Phase 7
+**Requirements**: SYNC-01, SYNC-02, SYNC-03
+**Success Criteria** (what must be TRUE):
+  1. Gateway verifies `X-Hub-Signature-256` HMAC signatures using timing-safe comparison, rejecting invalid signatures with `401 Unauthorized`.
+  2. On `push` event, graph updates modified files, author touches, and co-change coupling without triggering a full repository re-clone.
+  3. On merged pull request with ADR modifications, system advances `valid_to` timestamps on superseded decisions and triggers a visual live pulse on the Cytoscape canvas.
+**Plans**: 3 plans (TBD during Phase 8 planning)
+
+---
+
 <details>
 <summary>✅ v1.0 MVP (Phases 1-5) — SHIPPED 2026-10-16</summary>
 
----
 - [x] Phase 1: Database Schema & Vector Foundation (4/4 plans) — completed 2026-10-15
 - [x] Phase 2: Ingestion Pipeline & Decision Mining (4/4 plans) — completed 2026-10-15
 - [x] Phase 3: Query Gateway & Briefing Pipeline (4/4 plans) — completed 2026-10-15
 - [x] Phase 4: Next.js Frontend & Graph Canvas (4/4 plans) — completed 2026-10-15
 - [x] Phase 5: Revert Backtest & Showcase Corpus (4/4 plans) — completed 2026-10-16
 
-## Phase 1: Database Schema & Vector Foundation
-
-**Goal:** Establish the monorepo foundation, define the FalkorDB openCypher schema with 512-d vector index, implement all 8 parameterized named queries, and verify local Transformers.js Node.js CPU embedding generation.
-
-- **Plans:**
-  4/4 plans complete
-
-  - `01-02`: Author `schema.cypher` with constraints, node/edge types, and 512-d vector index.
-  - `01-03`: Implement the 8 parameterized named queries in `packages/graph/queries/*.cypher`.
-  - `01-04`: Build `packages/graph/embedding.ts` verifying Transformers.js EmbeddingGemma-2 on Node.js CPU with Matryoshka 512-d L2 re-normalization.
-- **Deliverables:** `packages/graph` client, verified `.cypher` files, and embedding unit test.
-- **Requirements Covered:** `GRAPH-01`, `GRAPH-02`, `EMB-01`, `VEC-01`.
-
----
-
-## Phase 2: Ingestion Pipeline & Decision Mining
-
-**Goal:** Implement the worker service that clones repositories, computes co-change coupling and components, identifies git reverts, extracts architectural decisions with temporal windows, and writes to FalkorDB using `(:IngestJob)` node tracking.
-
-- **Plans:**
-  4/4 plans complete
-
-  - `02-01`: Implement `packages/ingest/git` for shallow/blobless clones, commit extraction, author mapping, and `TOUCHES` relationships.
-  - `02-02`: Implement co-change coupling analysis and component grouping algorithm.
-  - `02-03`: Implement markdown ADR/RFC and commit decision miner with `SUPERSEDES` and temporal validity handling.
-  - `02-04`: Wire worker job runner with pure FalkorDB `IngestJob` status updates (`pending`, `mining`, `completed`, `failed`).
-- **Deliverables:** `packages/ingest` pipeline capable of taking a git repository and populating a workspace graph.
-- **Requirements Covered:** `JOB-01`, `ING-01`, `ING-02`, `ING-03`, `DEC-01`, `DEC-02`.
-
----
-
-## Phase 3: Query Gateway & Briefing Pipeline
-
-**Goal:** Expose read-only query endpoints via the gateway service, execute queries in parallel, run single-call Gemma 4 narration with Zod schema enforcement, enforce 100% citation integrity, and record write-back memory.
-
-- **Plans:**
-  4/4 plans complete
-
-  - `03-01`: Build `apps/gateway` (Hono / Node.js) exposing authenticated endpoints for the 8 named queries using `GRAPH.RO_QUERY`.
-  - `03-02`: Implement parallel multi-query execution dispatcher in `packages/agent`.
-  - `03-03`: Implement Gemma 4 narration with Zod schema validation and retry parser for structured output reliability.
-  - `03-04`: Implement citation integrity validator (drops uncited or invalid node claims) and `record_outcome` write-back memory.
-- **Deliverables:** Working gateway and briefing generation engine with verifiable node citations.
-- **Requirements Covered:** `GW-01`, `BRIEF-01`, `BRIEF-02`, `CITE-01`, `MEM-01`.
-
----
-
-## Phase 4: Next.js Frontend & Graph Canvas
-
-**Goal:** Build the user-facing web application featuring a unified command bar, contributor selector, brutalist 2077 tweakcn evidence cards, and an interactive Cytoscape.js canvas showing traversal paths behind claims.
-
-- **Plans:**
-  4/4 plans complete
-
-  - `04-01`: Initialize Next.js App Router app (`apps/web`) with Tailwind CSS, shadcn/ui, and the 2077 theme.
-  - `04-02`: Build the command bar interface, guest workspace switcher, and contributor selector ("Who am I").
-  - `04-03`: Build the Briefing View with Evidence Cards linked to exact graph nodes and git sources.
-  - `04-04`: Integrate Cytoscape.js canvas to render and highlight query traversal subgraphs with in-memory layout and "no graph, no answer" failure states.
-- **Deliverables:** Full-featured interactive web application deployed to Vercel.
-- **Requirements Covered:** `WS-01`, `UI-01`, `UI-02`, `UI-03`.
-
----
-
-## Phase 5: Revert Backtest & Showcase Corpus
-
-**Goal:** Build the automated backtest evaluation runner comparing historical revert recall against a no-graph baseline, and pre-index the showcase demonstration repositories for judging.
-
-- **Plans:**
-  4/4 plans complete
-
-  - `05-01`: Build `packages/eval` backtest harness that rewinds the graph (`asOf`) to historical revert dates and computes recall@k.
-  - `05-02`: Run and record the no-graph baseline benchmark for comparison.
-  - `05-03`: Ingest and pre-index 2 curated public repositories (e.g. Astro / Ember with ADRs) plus an instant synthetic demo dataset.
-  - `05-04`: Finalize README documentation, architecture diagrams, and demo script verification.
-- **Deliverables:** Backtest benchmark report (for README / blog post) and preloaded demo workspace.
-- **Requirements Covered:** `EVAL-01`.
-
----
-*Roadmap defined: 2026-10-15*
 </details>
