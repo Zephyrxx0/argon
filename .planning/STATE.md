@@ -44,7 +44,7 @@ See: [.planning/PROJECT.md](file:///home/zeph/Code/argon/.planning/PROJECT.md) (
 
 ## Next Action
 
-Milestone v1.0 MVP complete! All 5 phases and 20 plans completed. Ready for milestone audit and submission verification.
+Milestone v1.0 MVP complete and archived. Candidate specification for Milestone v2.0 (GitHub App Integration & Webhook Sync) authored in `.planning/v2.0-MILESTONE-SPEC.md`. Ready to initialize Milestone v2.0 via `/gsd-new-milestone`.
 
 ## Session
 

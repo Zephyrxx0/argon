@@ -34,15 +34,16 @@ Every briefing claim is mathematically grounded in and computed by the FalkorDB 
 - [x] **UI-01**: Command bar interface, brutalist evidence cards (2077 tweakcn theme), and Cytoscape.js traversal canvas (in-memory layout). — *Phase 04 (v1.0)*
 - [x] **EVAL-01**: Historical revert backtest runner with `asOf` date rewinding and no-graph baseline comparison. — *Phase 05 (v1.0)*
 
-### Active
+### Active (Milestone v2.0 Candidate Scope)
 
-- [ ] **EVAL-01**: Historical revert backtest runner with `asOf` date rewinding and no-graph baseline comparison.
-*(None — milestone v1.0 shipped; run `/gsd-new-milestone` to plan next version)*
+- [ ] **AUTH-01**: GitHub App OAuth authentication & session management in `apps/web`.
+- [ ] **AUTH-02**: Multi-tenant workspace authorization in FalkorDB (`:User`, `[:ACCESSES]`) & gateway security gate.
+- [ ] **ING-04**: Authenticated shallow git clones with short-lived installation tokens & credential-redacting logs.
+- [ ] **SYNC-01**: Webhook listener service processing `push` and `pull_request` events for incremental graph updates.
 
 ### Out of Scope
 
 - **Custom AST/Symbol Code Parser**: Graphify or AST tools are optional inputs, not core product deliverables.
-- **Mandatory GitHub App Login in MVP**: Private repo login deferred to post-hackathon to avoid Rule 6 ambiguities and setup friction.
 - **Multi-Repo Cross-Organization Indexing**: Scoped strictly to single-repository workspaces.
 - **External Redis/BullMQ Service**: FalkorDB itself acts as the single datastore and operational state store.
 - **Multi-step unconstrained Cypher generation**: Replaced by 8 locked, parameterized named queries to ensure multi-hop reliability.
