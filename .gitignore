@@ -13,3 +13,5 @@ DECISIONS.md
 PRD.md
 .planning/*.lock
 *.tsbuildinfo
+*.sqlite
+*.sqlite*
