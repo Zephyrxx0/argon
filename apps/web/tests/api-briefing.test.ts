@@ -94,5 +94,27 @@ describe('POST /api/briefing Route Handler', () => {
     expect(data.status).toBe('FALKORDB_TIMEOUT');
     expect(data.reason).toMatch(/FalkorDB Graph Unreachable \(503\)/i);
   });
+
+  it('returns 403 Forbidden when caller lacks access to private workspace', async () => {
+    const { ArgonGraphClient } = await import('@argon/graph');
+    vi.spyOn(ArgonGraphClient.prototype, 'ping').mockResolvedValueOnce(true);
+    const graphQueries = await import('@argon/graph');
+    vi.spyOn(graphQueries, 'checkWorkspaceAccess').mockResolvedValueOnce({
+      exists: true,
+      allowed: false,
+    });
+
+    const req = createRequest({
+      task: 'Audit private secrets',
+      workspaceId: 'private-vault',
+    });
+
+    const res = await POST(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(data.error).toBe('FORBIDDEN');
+    expect(data.status).toBe('FORBIDDEN');
+  });
 });
 

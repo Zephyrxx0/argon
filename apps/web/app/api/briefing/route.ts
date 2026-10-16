@@ -45,12 +45,71 @@ export async function POST(req: NextRequest) {
 
     const graphClient = new ArgonGraphClient();
 
+    // Extract caller identity from Bearer token if present (TENANT-01)
+    let callerToken: string | undefined;
+    let userId = 'anonymous';
+    const authHeader = req.headers.get('authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      callerToken = authHeader.slice(7);
+      try {
+        const { jwtVerify } = await import('jose');
+        const secret = new TextEncoder().encode(
+          process.env.BETTER_AUTH_SECRET || 'argon-dev-secret-at-least-32-chars-long'
+        );
+        const verified = await jwtVerify(callerToken, secret);
+        userId =
+          (verified.payload.userId as string) ||
+          (verified.payload.sub as string) ||
+          'anonymous';
+      } catch {
+        // Fallback to anonymous if token invalid/expired
+      }
+    }
+
+    // Verify tenant workspace authorization
+    try {
+      const isLive = await graphClient.ping();
+      if (isLive) {
+        const { checkWorkspaceAccess } = await import('@argon/graph');
+        const access = await checkWorkspaceAccess(graphClient, workspaceId, userId);
+        if (!access.exists) {
+          return NextResponse.json(
+            {
+              error: 'NOT_FOUND',
+              status: 'NOT_FOUND',
+              message: `Workspace '${workspaceId}' not found`,
+            },
+            { status: 404 }
+          );
+        }
+        if (!access.allowed) {
+          return NextResponse.json(
+            {
+              error: 'FORBIDDEN',
+              status: 'FORBIDDEN',
+              message: 'Workspace access denied',
+            },
+            { status: 403 }
+          );
+        }
+      }
+    } catch (accessErr: any) {
+      if (
+        accessErr?.message?.includes('ECONNREFUSED') ||
+        accessErr?.name === 'FalkorUnavailableError'
+      ) {
+        // Allow pipeline call to handle 503 cleanly
+      } else {
+        throw accessErr;
+      }
+    }
+
     // Client auto-selection conforming to D-12
     let client: GatewayClient;
     if (process.env.GATEWAY_URL) {
       client = new HttpGatewayClient({
         baseUrl: process.env.GATEWAY_URL,
-        secret: process.env.GATEWAY_SECRET || '',
+        secret: callerToken || process.env.GATEWAY_SECRET || '',
       });
     } else {
       client = new DirectGraphGatewayClient(graphClient);

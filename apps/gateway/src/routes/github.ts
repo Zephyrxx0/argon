@@ -11,6 +11,8 @@ export interface GitHubRouteOptions {
     installationToken: string;
     workspaceId: string;
     userId: string;
+    userLogin?: string;
+    userEmails?: string[];
   }) => Promise<void> | void;
 }
 
@@ -129,6 +131,8 @@ export function githubRoute(
           installationToken,
           workspaceId,
           userId: user.userId,
+          userLogin: (user.login as string | undefined) || (user.userLogin as string | undefined),
+          userEmails: user.email ? [user.email as string] : undefined,
         });
       }
 

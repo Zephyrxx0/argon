@@ -67,9 +67,13 @@ db.exec(`
 `);
 
 const baseURL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+const isBuildPhase =
+  process.env.NEXT_PHASE === 'phase-production-build' ||
+  process.env.npm_lifecycle_event === 'build';
+
 const secretKey =
   process.env.BETTER_AUTH_SECRET ||
-  (process.env.NODE_ENV === 'production'
+  (process.env.NODE_ENV === 'production' && !isBuildPhase
     ? (() => {
         throw new Error('BETTER_AUTH_SECRET environment variable is required in production');
       })()
@@ -111,9 +115,30 @@ export const auth = betterAuth({
       jwt: {
         sign: async (payload) => {
           const secret = new TextEncoder().encode(secretKey);
+
+          let userAccessToken: string | undefined;
+          let userLogin: string | undefined;
+          try {
+            if (payload.sub) {
+              const account = db
+                .prepare('SELECT accessToken FROM account WHERE userId = ? AND providerId = ? LIMIT 1')
+                .get(payload.sub, 'github') as { accessToken?: string } | undefined;
+              userAccessToken = account?.accessToken;
+
+              const userRow = db
+                .prepare('SELECT name FROM user WHERE id = ? LIMIT 1')
+                .get(payload.sub) as { name?: string } | undefined;
+              userLogin = userRow?.name;
+            }
+          } catch {
+            // Ignore SQLite lookup error in test/in-memory environments
+          }
+
           return await new SignJWT({
             ...payload,
             userId: payload.sub,
+            userAccessToken,
+            login: userLogin,
             isAnonymous: Boolean((payload as any).isAnonymous),
           })
             .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })

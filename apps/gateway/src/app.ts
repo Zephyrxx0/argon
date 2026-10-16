@@ -13,6 +13,7 @@ import { webhooksRoute, type WebhooksRouteOptions } from './routes/webhooks.js';
 import { eventsRoute, type EventsRouteOptions } from './routes/events.js';
 import { IncrementalSyncService } from './services/incremental-sync.js';
 import { syncOrchestrator } from './services/sync-orchestrator.js';
+import { runIngestion } from '@argon/ingest';
 
 export interface GatewayAppOptions {
   graphClient?: ArgonGraphClient;
@@ -42,7 +43,34 @@ export function createGatewayApp(options?: GatewayAppOptions): Hono {
 
   // GitHub App repository and ingestion routes
   const githubApp = options?.githubAppService ?? new GitHubAppService();
-  const ghRoute = githubRoute(githubApp, options?.graphClient, options?.githubRouteOptions);
+
+  const defaultOnIngest = async (payload: {
+    repositoryFullName: string;
+    installationId: number;
+    installationToken: string;
+    workspaceId: string;
+    userId: string;
+    userLogin?: string;
+    userEmails?: string[];
+  }) => {
+    runIngestion({
+      repoUrl: `https://github.com/${payload.repositoryFullName}`,
+      workspaceId: payload.workspaceId,
+      installationToken: payload.installationToken,
+      client: options?.graphClient,
+      userId: payload.userId,
+      userLogin: payload.userLogin,
+      userEmails: payload.userEmails,
+    }).catch((err) => {
+      console.error(`[gateway:ingest] Ingestion failed for ${payload.repositoryFullName}:`, err);
+    });
+  };
+
+  const githubRouteOptions: GitHubRouteOptions = {
+    onIngest: options?.githubRouteOptions?.onIngest ?? defaultOnIngest,
+    ...options?.githubRouteOptions,
+  };
+  const ghRoute = githubRoute(githubApp, options?.graphClient, githubRouteOptions);
   app.route('/api/v1/github', ghRoute);
   app.route('/api/v1/workspaces', ghRoute);
 

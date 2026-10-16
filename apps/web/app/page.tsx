@@ -27,8 +27,24 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [briefingResponse, setBriefingResponse] = useState<WebBriefingResponse | null>(null);
   const [uiPreferences, setUiPreferences] = useState<ArgonUiPreferences>(() => getStoredPreferences());
+  const [authToken, setAuthToken] = useState<string | undefined>(undefined);
 
   const cyRef = useRef<Core | null>(null);
+
+  // Retrieve token for SSE live sync stream (SYNC-03)
+  useEffect(() => {
+    let active = true;
+    if (typeof getToken === 'function') {
+      getToken().then((tok) => {
+        if (active && tok) {
+          setAuthToken(tok);
+        }
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, [getToken, currentWorkspaceId]);
 
   // Sync workspace from AuthProvider state (D-15)
   useEffect(() => {
@@ -262,7 +278,7 @@ export default function HomePage() {
   }, [briefingResponse]);
 
   return (
-    <GraphSyncProvider>
+    <GraphSyncProvider workspaceId={currentWorkspaceId} token={authToken}>
       <main className="min-h-screen bg-background text-foreground flex flex-col font-mono">
         {/* Unified Top Navigation Header */}
         <HeaderBar
