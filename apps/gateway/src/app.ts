@@ -10,6 +10,8 @@ import { briefingRoute, type BriefingRouteOptions } from './routes/briefing.js';
 import { githubRoute, type GitHubRouteOptions } from './routes/github.js';
 import { GitHubAppService } from './services/github-app.js';
 import { webhooksRoute, type WebhooksRouteOptions } from './routes/webhooks.js';
+import { IncrementalSyncService } from './services/incremental-sync.js';
+import { syncOrchestrator } from './services/sync-orchestrator.js';
 
 export interface GatewayAppOptions {
   graphClient?: ArgonGraphClient;
@@ -20,6 +22,7 @@ export interface GatewayAppOptions {
   githubAppService?: GitHubAppService;
   githubRouteOptions?: GitHubRouteOptions;
   webhooksOptions?: WebhooksRouteOptions;
+  incrementalSyncService?: IncrementalSyncService;
 }
 
 export function createGatewayApp(options?: GatewayAppOptions): Hono {
@@ -41,7 +44,17 @@ export function createGatewayApp(options?: GatewayAppOptions): Hono {
   app.route('/api/v1/github', ghRoute);
   app.route('/api/v1/workspaces', ghRoute);
 
-  // Webhook receiver routes
+  // Webhook receiver routes and sync runner
+  const incrementalSync =
+    options?.incrementalSyncService ??
+    new IncrementalSyncService({
+      graphClient: options?.graphClient,
+      githubAppService: githubApp,
+    });
+  syncOrchestrator.registerRunner((jobId, event, payload, workspaceId) =>
+    incrementalSync.sync(jobId, event, payload, workspaceId),
+  );
+
   const whRoute = webhooksRoute({
     graphClient: options?.graphClient,
     webhookSecret: options?.webhookSecret,

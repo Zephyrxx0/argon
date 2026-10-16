@@ -96,6 +96,14 @@ export class GitHubAppService {
   }
 
   /**
+   * Get an Octokit instance authenticated with the installation token.
+   */
+  async getInstallationOctokit(installationId: number): Promise<Octokit> {
+    const token = await this.getInstallationToken(installationId);
+    return this.octokitFactory(token);
+  }
+
+  /**
    * List installations accessible to the user given their user access token.
    */
   async getUserInstallations(userAccessToken: string) {

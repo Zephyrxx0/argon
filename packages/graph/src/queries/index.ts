@@ -40,6 +40,7 @@ import {
 
 export * from './types';
 export * from './auth';
+export * from './sync';
 
 const EMBEDDED_QUERIES: Record<string, string> = {
   '01_resolve_scope.cypher': `// Resolves input paths or component names to existing graph entities

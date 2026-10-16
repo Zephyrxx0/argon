@@ -2,6 +2,7 @@ export * from './git/types.js';
 export * from './git/clone.js';
 export * from './git/author.js';
 export * from './git/log.js';
+export * from './git/redact.js';
 
 export * from './coupling/types.js';
 export * from './coupling/filter.js';

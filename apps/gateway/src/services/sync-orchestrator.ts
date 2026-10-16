@@ -18,7 +18,7 @@ export type SyncRunner = (
   event: string,
   payload: any,
   workspaceId: string,
-) => Promise<void>;
+) => Promise<any>;
 
 export class SyncOrchestrator {
   private runner: SyncRunner | null = null;
@@ -51,6 +51,7 @@ export class SyncOrchestrator {
     if (graphClient) {
       try {
         await graphClient.query(
+          workspaceId || 'system',
           `MERGE (j:IngestJob { id: $id })
            SET j.workspace_id = $workspaceId,
                j.type = 'incremental_sync',
@@ -91,6 +92,7 @@ export class SyncOrchestrator {
       if (graphClient) {
         try {
           await graphClient.query(
+            workspaceId || 'system',
             `MATCH (j:IngestJob { id: $id }) SET j.status = 'processing'`,
             { id: jobId },
           );
@@ -111,6 +113,7 @@ export class SyncOrchestrator {
 
         if (graphClient) {
           await graphClient.query(
+            workspaceId || 'system',
             `MATCH (j:IngestJob { id: $id }) SET j.status = 'completed', j.completed_at = $completedAt`,
             { id: jobId, completedAt: Date.now() },
           );
@@ -128,6 +131,7 @@ export class SyncOrchestrator {
         if (graphClient) {
           try {
             await graphClient.query(
+              workspaceId || 'system',
               `MATCH (j:IngestJob { id: $id }) SET j.status = 'failed', j.error = $error, j.completed_at = $completedAt`,
               { id: jobId, error: errorMsg, completedAt: Date.now() },
             );

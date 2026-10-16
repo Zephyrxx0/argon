@@ -15,12 +15,14 @@ describe('Webhook Routes (Task 08-01-03, SYNC-01)', () => {
     orchestrator = new SyncOrchestrator();
 
     mockGraphClient = {
-      query: vi.fn().mockImplementation((cypher: string, params: any) => {
+      query: vi.fn().mockImplementation((...args: any[]) => {
+        const cypher = typeof args[1] === 'string' ? args[1] : args[0];
+        const params = typeof args[1] === 'string' ? args[2] : args[1];
         if (cypher.includes('MATCH (w:Workspace)')) {
-          if (params.repoFullName === 'org/tracked-repo' || params.repoName === 'tracked-repo') {
-            return Promise.resolve({ rows: [{ id: 'tracked-repo-ws' }] });
+          if (params?.repoFullName === 'org/tracked-repo' || params?.repoName === 'tracked-repo') {
+            return Promise.resolve({ data: [{ id: 'tracked-repo-ws' }], rows: [{ id: 'tracked-repo-ws' }] });
           }
-          return Promise.resolve({ rows: [] });
+          return Promise.resolve({ data: [], rows: [] });
         }
         if (cypher.includes('MERGE (j:IngestJob')) {
           return Promise.resolve({ rows: [] });
@@ -56,7 +58,7 @@ describe('Webhook Routes (Task 08-01-03, SYNC-01)', () => {
     });
 
     expect(res.status).toBe(401);
-    const data = await res.json();
+    const data = (await res.json()) as any;
     expect(data.code).toBe('MISSING_SIGNATURE');
   });
 
@@ -73,7 +75,7 @@ describe('Webhook Routes (Task 08-01-03, SYNC-01)', () => {
     });
 
     expect(res.status).toBe(401);
-    const data = await res.json();
+    const data = (await res.json()) as any;
     expect(data.code).toBe('INVALID_SIGNATURE');
   });
 
@@ -97,7 +99,7 @@ describe('Webhook Routes (Task 08-01-03, SYNC-01)', () => {
     });
 
     expect(res.status).toBe(200);
-    const data = await res.json();
+    const data = (await res.json()) as any;
     expect(data.ignored).toBe(true);
     expect(data.reason).toBe('non_default_branch');
   });
@@ -123,7 +125,7 @@ describe('Webhook Routes (Task 08-01-03, SYNC-01)', () => {
     });
 
     expect(res.status).toBe(200);
-    const data = await res.json();
+    const data = (await res.json()) as any;
     expect(data.ignored).toBe(true);
     expect(data.reason).toBe('pr_not_merged');
   });
@@ -145,7 +147,7 @@ describe('Webhook Routes (Task 08-01-03, SYNC-01)', () => {
     });
 
     expect(res.status).toBe(200);
-    const data = await res.json();
+    const data = (await res.json()) as any;
     expect(data.ignored).toBe(true);
     expect(data.reason).toBe('unsupported_event');
   });
@@ -170,7 +172,7 @@ describe('Webhook Routes (Task 08-01-03, SYNC-01)', () => {
     });
 
     expect(res.status).toBe(200);
-    const data = await res.json();
+    const data = (await res.json()) as any;
     expect(data.ignored).toBe(true);
     expect(data.reason).toBe('untracked_repository');
   });
@@ -200,7 +202,7 @@ describe('Webhook Routes (Task 08-01-03, SYNC-01)', () => {
     });
 
     expect(res.status).toBe(202);
-    const data = await res.json();
+    const data = (await res.json()) as any;
     expect(data.status).toBe('queued');
     expect(data.deliveryId).toBe('deliv-valid-1');
     expect(data.workspaceId).toBe('tracked-repo-ws');
@@ -243,7 +245,7 @@ describe('Webhook Routes (Task 08-01-03, SYNC-01)', () => {
     });
 
     expect(res2.status).toBe(200);
-    const data2 = await res2.json();
+    const data2 = (await res2.json()) as any;
     expect(data2.deduplicated).toBe(true);
   });
 
@@ -268,7 +270,7 @@ describe('Webhook Routes (Task 08-01-03, SYNC-01)', () => {
     });
 
     expect(res.status).toBe(202);
-    const data = await res.json();
+    const data = (await res.json()) as any;
     expect(data.status).toBe('queued');
     expect(data.workspaceId).toBe('tracked-repo-ws');
   });

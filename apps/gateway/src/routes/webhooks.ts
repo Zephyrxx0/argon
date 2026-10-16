@@ -22,7 +22,7 @@ export function webhooksRoute(options?: WebhooksRouteOptions): Hono {
   router.post('/github', async (c) => {
     const event = c.req.header('X-GitHub-Event') || c.req.header('x-github-event') || '';
     const deliveryId = c.req.header('X-GitHub-Delivery') || c.req.header('x-github-delivery') || '';
-    const payload = c.get('webhookPayload') || (await c.req.json().catch(() => ({})));
+    const payload = (c.get as any)('webhookPayload') || (await c.req.json().catch(() => ({})));
 
     // 1. Delivery Deduplication
     if (deliveryId && dedup.isDuplicate(deliveryId)) {
@@ -59,7 +59,8 @@ export function webhooksRoute(options?: WebhooksRouteOptions): Hono {
 
     if (graphClient) {
       try {
-        const result = await graphClient.query<{ id: string }>(
+        const result: any = await graphClient.query(
+          'system',
           `MATCH (w:Workspace)
            WHERE w.github_repo = $repoFullName OR w.id = $repoName OR w.name = $repoName
            RETURN w.id AS id
@@ -67,11 +68,13 @@ export function webhooksRoute(options?: WebhooksRouteOptions): Hono {
           { repoFullName, repoName },
         );
 
-        if (!result.rows || result.rows.length === 0) {
+        const rows = result?.data || result?.rows || [];
+        if (rows.length === 0) {
           return c.json({ ignored: true, reason: 'untracked_repository' }, 200);
         }
 
-        workspaceId = result.rows[0].id;
+        const firstRow = rows[0];
+        workspaceId = typeof firstRow === 'object' && firstRow.id ? firstRow.id : (firstRow?.[0] ?? firstRow);
       } catch (err) {
         console.error('Error resolving workspace for repository:', err);
         return c.json({ error: 'Failed to verify workspace', code: 'WORKSPACE_LOOKUP_ERROR' }, 500);

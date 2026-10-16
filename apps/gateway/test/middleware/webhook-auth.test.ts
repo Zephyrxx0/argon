@@ -43,7 +43,7 @@ describe('Webhook Authentication Middleware (Task 08-01-01, SYNC-01)', () => {
     });
 
     expect(res.status).toBe(401);
-    const data = await res.json();
+    const data = (await res.json()) as any;
     expect(data.code).toBe('MISSING_SIGNATURE');
   });
 
@@ -62,7 +62,7 @@ describe('Webhook Authentication Middleware (Task 08-01-01, SYNC-01)', () => {
     });
 
     expect(res.status).toBe(401);
-    const data = await res.json();
+    const data = (await res.json()) as any;
     expect(data.code).toBe('INVALID_SIGNATURE');
   });
 
@@ -70,7 +70,7 @@ describe('Webhook Authentication Middleware (Task 08-01-01, SYNC-01)', () => {
     const app = new Hono();
     app.use('/webhook', webhookSignatureValidator(secret));
     app.post('/webhook', (c) => {
-      const payload = c.get('webhookPayload');
+      const payload = (c.get as any)('webhookPayload');
       return c.json({ ok: true, payload });
     });
 
@@ -87,7 +87,7 @@ describe('Webhook Authentication Middleware (Task 08-01-01, SYNC-01)', () => {
     });
 
     expect(res.status).toBe(200);
-    const data = await res.json();
+    const data = (await res.json()) as any;
     expect(data.ok).toBe(true);
     expect(data.payload.repository.name).toBe('argon');
   });

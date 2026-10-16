@@ -187,6 +187,9 @@ importers:
       '@argon/graph':
         specifier: workspace:*
         version: link:../../packages/graph
+      '@argon/ingest':
+        specifier: workspace:*
+        version: link:../../packages/ingest
       '@hono/node-server':
         specifier: ^1.13.8
         version: 1.19.17(hono@4.13.13)

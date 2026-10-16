@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { randomUUID } from 'node:crypto';
 import type { CloneOptions, CloneResult } from './types.js';
-import { redactSecrets, sanitizeError, createSanitizedAuthError } from './redact.js';
+import { sanitizeError, createSanitizedAuthError } from './redact.js';
 
 /**
  * Clean up a cloned repository directory unless debug retention is requested.
@@ -51,14 +51,7 @@ export async function cloneRepository(repoUrl: string, options: CloneOptions = {
   // Handle local path urls (file:// or raw directory)
   const normalizedUrl = repoUrl.startsWith('file://') ? repoUrl.slice(7) : repoUrl;
 
-  const git: SimpleGit = simpleGit({
-    spawnOptions: {
-      env: {
-        ...process.env,
-        GIT_TERMINAL_PROMPT: '0',
-      },
-    },
-  });
+  const git: SimpleGit = simpleGit().env('GIT_TERMINAL_PROMPT', '0');
   try {
     await git.clone(normalizedUrl, targetDir, cloneArgs);
   } catch (error: any) {

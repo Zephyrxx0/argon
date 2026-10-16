@@ -25,7 +25,7 @@ export function githubRoute(
    * GET /repositories - Lists accessible repositories for the authenticated user (D-09, D-10)
    */
   router.get('/repositories', async (c) => {
-    const user = c.get('user') as JwtAuthUser | undefined;
+    const user = (c.get as any)('user') as JwtAuthUser | undefined;
 
     if (!user || user.isAnonymous) {
       const errorResponse: GatewayErrorResponse = {
@@ -59,7 +59,7 @@ export function githubRoute(
    * POST /ingest - Dispatches authenticated private repository ingestion with dual verification (D-04, T-07-04)
    */
   router.post('/ingest', async (c) => {
-    const user = c.get('user') as JwtAuthUser | undefined;
+    const user = (c.get as any)('user') as JwtAuthUser | undefined;
 
     if (!user || user.isAnonymous) {
       const errorResponse: GatewayErrorResponse = {
