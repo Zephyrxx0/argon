@@ -5,11 +5,19 @@ import type { Briefing } from '@argon/agent';
 import { StickyJumpBar, type SectionCitationCounts } from './sticky-jump-bar';
 import { EvidenceCard } from './evidence-card';
 import { KillSwitchCard } from './kill-switch-card';
+import { ForbiddenCard, NotFoundCard } from './forbidden-card';
 import { Loader2, Layers, GitFork, Users, ShieldAlert, History } from 'lucide-react';
 import { clsx } from 'clsx';
 
 export interface WebBriefingResponse {
-  status: 'SUCCESS' | 'NO_GRAPH_DATA' | 'CITATION_INTEGRITY_FAILURE' | 'ERROR' | 'FALKORDB_TIMEOUT';
+  status:
+    | 'SUCCESS'
+    | 'NO_GRAPH_DATA'
+    | 'CITATION_INTEGRITY_FAILURE'
+    | 'ERROR'
+    | 'FALKORDB_TIMEOUT'
+    | 'FORBIDDEN'
+    | 'NOT_FOUND';
   briefingId?: string;
   briefing?: Briefing | null;
   evidence?: {
@@ -20,12 +28,14 @@ export interface WebBriefingResponse {
     verifiedNodeIds?: string[];
   } | null;
   reason?: string;
+  workspaceId?: string;
 }
 
 export interface BriefingViewProps {
   response: WebBriefingResponse | null;
   isLoading?: boolean;
   onRetryConnection?: () => void;
+  onSelectWorkspace?: (workspaceId: string) => void;
   className?: string;
 }
 
@@ -33,6 +43,7 @@ export function BriefingView({
   response,
   isLoading = false,
   onRetryConnection,
+  onSelectWorkspace,
   className,
 }: BriefingViewProps) {
   // 1. Loading Skeleton State
@@ -60,7 +71,30 @@ export function BriefingView({
     );
   }
 
-  // 2. Kill-Switch Refusal & Error States
+  // 2. 403 Forbidden Access Denial Guard (UI-SPEC §Copywriting Contract, D-12)
+  if (response?.status === 'FORBIDDEN') {
+    return (
+      <ForbiddenCard
+        workspaceId={response.workspaceId}
+        reason={response.reason}
+        onSelectWorkspace={onSelectWorkspace}
+        className={className}
+      />
+    );
+  }
+
+  // 3. 404 Not Found Workspace Warning
+  if (response?.status === 'NOT_FOUND') {
+    return (
+      <NotFoundCard
+        workspaceId={response.workspaceId}
+        reason={response.reason}
+        className={className}
+      />
+    );
+  }
+
+  // 4. Kill-Switch Refusal & Error States
   if (response?.status === 'CITATION_INTEGRITY_FAILURE' || response?.status === 'FALKORDB_TIMEOUT') {
     return (
       <KillSwitchCard
