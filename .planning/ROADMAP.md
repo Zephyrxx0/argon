@@ -6,7 +6,7 @@
 ## Milestones
 
 - ✅ **v1.0 MVP** — Phases 1-5 (shipped 2026-10-16) — [.planning/milestones/v1.0-ROADMAP.md](file:///home/zeph/Code/argon/.planning/milestones/v1.0-ROADMAP.md)
-- 🟡 **v2.0 GitHub App Integration & Incremental Sync** — Phases 6-8 (in planning)
+- ✅ **v2.0 GitHub App Integration & Incremental Sync** — Phases 6-8 (completed 2026-10-16)
 
 ## Phase Overview
 
@@ -20,7 +20,7 @@ Phase 6: Authentication & Multi-Tenant Authorization (AUTH-01, AUTH-02, TENANT-0
 
 - [x] **Phase 6: Authentication & Multi-Tenant Authorization** — Better Auth GitHub OAuth integration with anonymous guest plugin, stateless cookie sessions, and FalkorDB graph multi-tenancy. (completed 2026-10-16)
 - [x] **Phase 7: Authenticated Ingestion & Private Repo Selector** — GitHub App installation token generation, secret-scrubbed shallow cloning, and private repository selector. (completed 2026-10-16)
-- [ ] **Phase 8: Webhook Receiver & Incremental Sync Engine** — HMAC-verified webhook handler, incremental commit/touch updates, ADR temporal validity advancement, and live sync pulse.
+- [x] **Phase 8: Webhook Receiver & Incremental Sync Engine** — HMAC-verified webhook handler, incremental commit/touch updates, ADR temporal validity advancement, and live sync pulse. (completed 2026-10-16)
 
 ---
 
@@ -67,7 +67,7 @@ Phase 6: Authentication & Multi-Tenant Authorization (AUTH-01, AUTH-02, TENANT-0
   2. On `push` event, graph updates modified files, author touches, and co-change coupling without triggering a full repository re-clone.
   3. On merged pull request with ADR modifications, system advances `valid_to` timestamps on superseded decisions and triggers a visual live pulse on the Cytoscape canvas.
 
-**Plans**: 3 plans (TBD during Phase 8 planning)
+**Plans**: 3 plans (completed 2026-10-16)
 
 ---
 
