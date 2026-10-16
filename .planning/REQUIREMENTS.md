@@ -9,12 +9,12 @@ Requirements for Milestone v2.0 release. Each maps to roadmap phases.
 
 ### Authentication & Identity
 
-- [ ] **AUTH-01**: User can authenticate via GitHub OAuth using Better Auth in `apps/web` with stateless encrypted session cookies and view their profile in HeaderBar.
-- [ ] **AUTH-02**: Unauthenticated guests can seamlessly browse public showcase workspaces and run graph queries using Better Auth's `anonymous()` plugin without forced login or redirect loops.
+- [x] **AUTH-01**: User can authenticate via GitHub OAuth using Better Auth in `apps/web` with stateless encrypted session cookies and view their profile in HeaderBar.
+- [x] **AUTH-02**: Unauthenticated guests can seamlessly browse public showcase workspaces and run graph queries using Better Auth's `anonymous()` plugin without forced login or redirect loops.
 
 ### Multi-Tenant Graph Authorization
 
-- [ ] **TENANT-01**: User can have their workspace access securely isolated in FalkorDB via `(:User)-[:ACCESSES]->(:Workspace)` edges, verified by the gateway before executing named queries.
+- [x] **TENANT-01**: User can have their workspace access securely isolated in FalkorDB via `(:User)-[:ACCESSES]->(:Workspace)` edges, verified by the gateway before executing named queries.
 - [ ] **TENANT-02**: User can link their authenticated GitHub identity to mined `(:Person)` graph nodes in the repository commit graph.
 
 ### Authenticated Ingestion & Secret Redaction
@@ -49,13 +49,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01 | Phase 06 | Pending |
-| AUTH-02 | Phase 06 | Pending |
-| TENANT-01 | Phase 06 | Pending |
+| AUTH-01 | Phase 06 | Complete |
+| AUTH-02 | Phase 06 | Complete |
+| TENANT-01 | Phase 06 | Complete |
 | TENANT-02 | Phase 07 | Pending |
 | ING-04 | Phase 07 | Pending |
 | ING-05 | Phase 07 | Pending |
 | SYNC-01 | Phase 08 | Pending |
 | SYNC-02 | Phase 08 | Pending |
 | SYNC-03 | Phase 08 | Pending |
-
