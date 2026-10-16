@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-15T19:52:39.801Z",
+  "timestamp": "2026-10-16T04:51:09.516Z",
   "environment": {
     "nodeVersion": "v22.22.2",
     "platform": "linux",
@@ -14,7 +14,7 @@
       "recallAt5": 0.2917,
       "mrr": 0.1619,
       "supersededRate": 0.125,
-      "avgLatencyMs": 120
+      "avgLatencyMs": 156
     },
     "raw-llm": {
       "method": "raw-llm",
@@ -62,7 +62,7 @@
       "supersededIds": [
         "DEC-001"
       ],
-      "latencyMs": 1267,
+      "latencyMs": 1654,
       "hitAt1": false,
       "hitAt3": false,
       "hitAt5": false,
@@ -93,7 +93,7 @@
       "supersededIds": [
         "DEC-003"
       ],
-      "latencyMs": 148,
+      "latencyMs": 97,
       "hitAt1": false,
       "hitAt3": false,
       "hitAt5": false,
@@ -124,7 +124,7 @@
       "supersededIds": [
         "DEC-005"
       ],
-      "latencyMs": 72,
+      "latencyMs": 140,
       "hitAt1": false,
       "hitAt3": false,
       "hitAt5": false,
@@ -155,7 +155,7 @@
       "supersededIds": [
         "DEC-007"
       ],
-      "latencyMs": 71,
+      "latencyMs": 99,
       "hitAt1": false,
       "hitAt3": false,
       "hitAt5": false,
@@ -184,7 +184,7 @@
         "DEC-009"
       ],
       "supersededIds": [],
-      "latencyMs": 71,
+      "latencyMs": 90,
       "hitAt1": false,
       "hitAt3": false,
       "hitAt5": false,
@@ -213,7 +213,7 @@
         "DEC-010"
       ],
       "supersededIds": [],
-      "latencyMs": 66,
+      "latencyMs": 87,
       "hitAt1": false,
       "hitAt3": false,
       "hitAt5": false,
@@ -242,7 +242,7 @@
         "DEC-011"
       ],
       "supersededIds": [],
-      "latencyMs": 60,
+      "latencyMs": 80,
       "hitAt1": false,
       "hitAt3": false,
       "hitAt5": false,
@@ -273,7 +273,7 @@
       "supersededIds": [
         "DEC-012"
       ],
-      "latencyMs": 72,
+      "latencyMs": 90,
       "hitAt1": false,
       "hitAt3": false,
       "hitAt5": false,
@@ -403,7 +403,7 @@
       "supersededIds": [
         "RFC-0278"
       ],
-      "latencyMs": 67,
+      "latencyMs": 87,
       "hitAt1": false,
       "hitAt3": false,
       "hitAt5": false,
@@ -533,7 +533,7 @@
       "supersededIds": [
         "RFC-0213"
       ],
-      "latencyMs": 64,
+      "latencyMs": 94,
       "hitAt1": false,
       "hitAt3": false,
       "hitAt5": false,
@@ -663,7 +663,7 @@
       "supersededIds": [
         "RFC-0095"
       ],
-      "latencyMs": 68,
+      "latencyMs": 89,
       "hitAt1": false,
       "hitAt3": false,
       "hitAt5": false,
@@ -793,7 +793,7 @@
       "supersededIds": [
         "RFC-0293"
       ],
-      "latencyMs": 68,
+      "latencyMs": 92,
       "hitAt1": false,
       "hitAt3": false,
       "hitAt5": false,
@@ -923,7 +923,7 @@
       "supersededIds": [
         "RFC-0454"
       ],
-      "latencyMs": 71,
+      "latencyMs": 85,
       "hitAt1": false,
       "hitAt3": false,
       "hitAt5": false,
@@ -1053,7 +1053,7 @@
       "supersededIds": [
         "RFC-0280"
       ],
-      "latencyMs": 71,
+      "latencyMs": 82,
       "hitAt1": false,
       "hitAt3": false,
       "hitAt5": false,
@@ -1181,7 +1181,7 @@
         "RFC-0432"
       ],
       "supersededIds": [],
-      "latencyMs": 62,
+      "latencyMs": 90,
       "hitAt1": false,
       "hitAt3": false,
       "hitAt5": false,
@@ -1311,7 +1311,7 @@
       "supersededIds": [
         "RFC-0311"
       ],
-      "latencyMs": 70,
+      "latencyMs": 90,
       "hitAt1": false,
       "hitAt3": false,
       "hitAt5": false,
@@ -1441,7 +1441,7 @@
       "supersededIds": [
         "RFC-0143"
       ],
-      "latencyMs": 60,
+      "latencyMs": 79,
       "hitAt1": false,
       "hitAt3": false,
       "hitAt5": true,
@@ -1569,7 +1569,7 @@
         "RFC-0268"
       ],
       "supersededIds": [],
-      "latencyMs": 64,
+      "latencyMs": 85,
       "hitAt1": false,
       "hitAt3": false,
       "hitAt5": false,
@@ -1591,7 +1591,7 @@
         "ADR-001"
       ],
       "supersededIds": [],
-      "latencyMs": 63,
+      "latencyMs": 90,
       "hitAt1": false,
       "hitAt3": false,
       "hitAt5": true,
@@ -1613,7 +1613,7 @@
         "ADR-002"
       ],
       "supersededIds": [],
-      "latencyMs": 66,
+      "latencyMs": 90,
       "hitAt1": false,
       "hitAt3": false,
       "hitAt5": true,
@@ -1635,7 +1635,7 @@
         "ADR-003"
       ],
       "supersededIds": [],
-      "latencyMs": 63,
+      "latencyMs": 92,
       "hitAt1": false,
       "hitAt3": false,
       "hitAt5": true,
@@ -1657,7 +1657,7 @@
         "ADR-004"
       ],
       "supersededIds": [],
-      "latencyMs": 68,
+      "latencyMs": 84,
       "hitAt1": false,
       "hitAt3": true,
       "hitAt5": true,
@@ -1679,7 +1679,7 @@
         "ADR-005"
       ],
       "supersededIds": [],
-      "latencyMs": 67,
+      "latencyMs": 78,
       "hitAt1": false,
       "hitAt3": false,
       "hitAt5": true,
@@ -1701,7 +1701,7 @@
         "ADR-006"
       ],
       "supersededIds": [],
-      "latencyMs": 67,
+      "latencyMs": 88,
       "hitAt1": true,
       "hitAt3": true,
       "hitAt5": true,
