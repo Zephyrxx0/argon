@@ -1,19 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-current_phase: 5
-status: Awaiting next milestone
-stopped_at: Phase 5 completed
-last_updated: "2026-10-16T04:56:59.104Z"
+milestone: v2.0
+milestone_name: GitHub App Integration & Incremental Sync
+status: planning
+last_updated: "2026-10-16T05:33:53.530Z"
 last_activity: 2026-10-16
-last_activity_desc: Milestone v1.0 completed and archived
-state_head: 5a407b0111bd6b775bed9b53c7dc177e8c257723
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 20
-  completed_plans: 20
-current_phase_name: revert-backtest-showcase-corpus
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # State: Argon
@@ -54,10 +51,10 @@ Milestone v1.0 MVP complete and archived. Candidate specification for Milestone 
 
 ## Current Position
 
-Phase: Milestone v1.0 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-10-16 — Milestone v1.0 completed and archived
+Status: Defining requirements
+Last activity: 2026-10-16 — Milestone v2.0 started
 
 ## Operator Next Steps
 
