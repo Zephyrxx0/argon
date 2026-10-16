@@ -20,6 +20,9 @@ export async function initWorkspaceGraph(
     'CREATE INDEX FOR (b:Briefing) ON (b.id)',
     'CREATE INDEX FOR (j:IngestJob) ON (j.id)',
     'CREATE INDEX FOR (i:Issue) ON (i.id)',
+    'CREATE INDEX FOR (u:User) ON (u.id)',
+    'CREATE INDEX FOR (w:Workspace) ON (w.id)',
+    'CREATE INDEX FOR (o:Organization) ON (o.id)',
   ];
 
   for (const stmt of indexStatements) {
@@ -43,6 +46,9 @@ export async function initWorkspaceGraph(
     { label: 'IngestJob', prop: 'id' },
     { label: 'Briefing', prop: 'id' },
     { label: 'Issue', prop: 'id' },
+    { label: 'User', prop: 'id' },
+    { label: 'Workspace', prop: 'id' },
+    { label: 'Organization', prop: 'id' },
   ];
 
   for (const { label, prop } of uniqueConstraints) {
@@ -68,6 +74,20 @@ export async function initWorkspaceGraph(
   } catch (err: any) {
     const msg = err?.message ?? '';
     if (!msg.includes('already exists') && !msg.includes('already indexed')) {
+      throw err;
+    }
+  }
+
+  // 4. Initialize Workspace node with is_public flag to prevent showcase lockouts (D-09)
+  try {
+    await graph.query(
+      `MERGE (w:Workspace {id: $workspaceId})
+       ON CREATE SET w.is_public = (CASE WHEN $workspaceId = 'ember-adr-showcase' OR $workspaceId = 'synthetic-demo' OR $workspaceId = 'argon-dogfood' THEN true ELSE false END)`,
+      { params: { workspaceId } }
+    );
+  } catch (err: any) {
+    const msg = err?.message ?? '';
+    if (!msg.includes('already exists')) {
       throw err;
     }
   }

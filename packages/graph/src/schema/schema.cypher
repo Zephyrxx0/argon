@@ -58,6 +58,28 @@
 //   started_at: INTEGER,   // Epoch timestamp in milliseconds
 //   updated_at: INTEGER    // Epoch timestamp in milliseconds
 // })
+//
+// (:User {
+//   id: STRING,            // Better Auth userId or guest UUID
+//   github_id: STRING,     // GitHub numeric ID as string (null for guests)
+//   login: STRING,         // GitHub username or guest handle
+//   avatar_url: STRING,    // Avatar URL or fallback placeholder
+//   created_at: INTEGER    // Epoch timestamp in milliseconds
+//                          // NOTE: Raw emails MUST NOT be stored in FalkorDB per D-10
+// })
+//
+// (:Workspace {
+//   id: STRING,            // Workspace repository identifier (e.g. 'ember-adr-showcase')
+//   is_public: BOOLEAN,    // true for showcase repos per D-09, false for private user repos
+//   name: STRING,          // Workspace display name
+//   repo_url: STRING       // Repository git URL
+// })
+//
+// (:Organization {
+//   id: STRING,            // Unique organization identifier
+//   name: STRING,          // Organization display name
+//   created_at: INTEGER    // Epoch timestamp in milliseconds
+// })
 
 // ==========================================
 // 2. Core Relationship Types
@@ -75,6 +97,9 @@
 // (Person)-[:FAMILIAR_WITH {strength: FLOAT}]->(Component)
 // (Briefing)-[:CITES {reason: STRING}]->(Decision)
 // (Briefing)-[:ABOUT]->(Component)
+// (User)-[:ACCESSES { role: 'owner' | 'member' | 'viewer' }]->(Workspace)
+// (User)-[:MEMBER_OF { role: 'admin' | 'member' }]->(Organization)
+// (Organization)-[:OWNS]->(Workspace)
 
 // ==========================================
 // 3. Range Indexes
@@ -88,6 +113,9 @@ CREATE INDEX FOR (d:Decision) ON (d.id);
 CREATE INDEX FOR (b:Briefing) ON (b.id);
 CREATE INDEX FOR (j:IngestJob) ON (j.id);
 CREATE INDEX FOR (i:Issue) ON (i.id);
+CREATE INDEX FOR (u:User) ON (u.id);
+CREATE INDEX FOR (w:Workspace) ON (w.id);
+CREATE INDEX FOR (o:Organization) ON (o.id);
 
 // ==========================================
 // 4. Uniqueness Constraints
@@ -101,6 +129,9 @@ CREATE INDEX FOR (i:Issue) ON (i.id);
 // IngestJob.id UNIQUE
 // Briefing.id UNIQUE
 // Issue.id UNIQUE
+// User.id UNIQUE
+// Workspace.id UNIQUE
+// Organization.id UNIQUE
 
 // ==========================================
 // 5. 512-Dimensional Vector Index
