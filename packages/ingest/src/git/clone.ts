@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { randomUUID } from 'node:crypto';
 import type { CloneOptions, CloneResult } from './types.js';
+import { redactSecrets, sanitizeError, createSanitizedAuthError } from './redact.js';
 
 /**
  * Clean up a cloned repository directory unless debug retention is requested.
@@ -17,7 +18,7 @@ export async function cleanupClone(targetDir: string, force = false): Promise<vo
     await fs.promises.rm(targetDir, { recursive: true, force: true });
   } catch (error) {
     // Non-fatal cleanup error
-    console.warn(`[ingest:clone] Failed to clean up temp directory ${targetDir}:`, error);
+    console.warn(`[ingest:clone] Failed to clean up temp directory ${targetDir}:`, sanitizeError(error).message);
   }
 }
 
@@ -42,11 +43,36 @@ export async function cloneRepository(repoUrl: string, options: CloneOptions = {
     cloneArgs.push(`--branch=${options.branch}`);
   }
 
+  if (options.installationToken) {
+    const creds = Buffer.from(`x-access-token:${options.installationToken}`).toString('base64');
+    cloneArgs.unshift('-c', `http.extraheader=Authorization: Basic ${creds}`);
+  }
+
   // Handle local path urls (file:// or raw directory)
   const normalizedUrl = repoUrl.startsWith('file://') ? repoUrl.slice(7) : repoUrl;
 
-  const git: SimpleGit = simpleGit();
-  await git.clone(normalizedUrl, targetDir, cloneArgs);
+  const git: SimpleGit = simpleGit({
+    spawnOptions: {
+      env: {
+        ...process.env,
+        GIT_TERMINAL_PROMPT: '0',
+      },
+    },
+  });
+  try {
+    await git.clone(normalizedUrl, targetDir, cloneArgs);
+  } catch (error: any) {
+    const errorMsg = String(error?.message || error);
+    if (
+      errorMsg.includes('Authentication failed') ||
+      errorMsg.includes('HTTP 401') ||
+      errorMsg.includes('HTTP 403') ||
+      errorMsg.includes('Bad credentials')
+    ) {
+      throw createSanitizedAuthError(error);
+    }
+    throw sanitizeError(error);
+  }
 
   const cleanup = async () => {
     if (!keepClone) {

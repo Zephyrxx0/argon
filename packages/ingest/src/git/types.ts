@@ -4,6 +4,7 @@ export interface CloneOptions {
   depth?: number;
   blobless?: boolean;
   keepClone?: boolean;
+  installationToken?: string;
 }
 
 export interface CloneResult {

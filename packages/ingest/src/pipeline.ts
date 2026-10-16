@@ -8,6 +8,7 @@ import { mineReverts } from './mining/reverts.js';
 import { mineCommitDecisions } from './mining/commits.js';
 import { embedDecisions } from './mining/embed.js';
 import { FalkorIngestWriter } from './writer/falkordb.js';
+import { redactSecrets } from './git/redact.js';
 
 export interface IngestPipelineConfig {
   repoUrl: string;
@@ -17,6 +18,7 @@ export interface IngestPipelineConfig {
   maxCommits?: number;
   keepClone?: boolean;
   client?: ArgonGraphClient;
+  installationToken?: string;
 }
 
 export interface IngestSummary {
@@ -59,6 +61,7 @@ export async function runIngestion(config: IngestPipelineConfig): Promise<Ingest
     const cloneResult = await cloneRepository(config.repoUrl, {
       depth: config.depth,
       keepClone: config.keepClone,
+      installationToken: config.installationToken,
     });
     cloneDir = cloneResult.dir;
     cleanupFn = cloneResult.cleanup;
@@ -182,7 +185,8 @@ export async function runIngestion(config: IngestPipelineConfig): Promise<Ingest
       durationMs: Date.now() - startTime,
     };
   } catch (error: any) {
-    await writer.updateJobStatus(jobId, config.repoUrl, 'failed', 0.0, error?.message || String(error));
+    const rawError = error?.message || String(error);
+    await writer.updateJobStatus(jobId, config.repoUrl, 'failed', 0.0, redactSecrets(rawError));
     throw error;
   } finally {
     if (cleanupFn) {

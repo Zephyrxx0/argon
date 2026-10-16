@@ -1,5 +1,6 @@
 import type { ArgonGraphClient } from '@argon/graph';
 import * as queries from './queries.js';
+import { redactSecrets } from '../git/redact.js';
 
 export class FalkorIngestWriter {
   constructor(
@@ -18,12 +19,13 @@ export class FalkorIngestWriter {
     error: string | null = null
   ): Promise<void> {
     const now = Math.floor(Date.now() / 1000);
+    const sanitizedError = error ? redactSecrets(error) : null;
     await this.client.query(this.workspaceId, queries.UPDATE_JOB_STATUS, {
       jobId,
-      repoUrl,
+      repoUrl: redactSecrets(repoUrl),
       status,
       progress,
-      error,
+      error: sanitizedError,
       updatedAt: now,
       startedAt: now,
     });
