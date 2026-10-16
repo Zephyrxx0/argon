@@ -2,10 +2,12 @@
 gsd_state_version: 1.0
 milestone: v1.0
 current_phase: 5
-status: completed
+status: Awaiting next milestone
 stopped_at: Phase 5 completed
-last_updated: "2026-10-16T01:18:20.000Z"
-state_head: db5948e
+last_updated: "2026-10-16T04:56:59.104Z"
+last_activity: 2026-10-16
+last_activity_desc: Milestone v1.0 completed and archived
+state_head: 5a407b0111bd6b775bed9b53c7dc177e8c257723
 progress:
   total_phases: 5
   completed_phases: 5
@@ -49,3 +51,14 @@ Milestone v1.0 MVP complete! All 5 phases and 20 plans completed. Ready for mile
 **Last session:** 2026-10-15T18:41:15.593Z
 **Stopped at:** Phase 5 context gathered
 **Resume file:** .planning/phases/05-revert-backtest-showcase-corpus/05-CONTEXT.md
+
+## Current Position
+
+Phase: Milestone v1.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-10-16 — Milestone v1.0 completed and archived
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone
