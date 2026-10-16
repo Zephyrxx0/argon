@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import HomePage from '@/app/page';
+import { AuthProvider } from '@/app/providers';
 
 describe('Argon Web App Integration', () => {
   beforeEach(() => {
@@ -70,7 +71,11 @@ describe('Argon Web App Integration', () => {
   });
 
   it('renders initial landing state with HeaderBar, ShowcaseHub, and Cytoscape container', () => {
-    render(<HomePage />);
+    render(
+      <AuthProvider>
+        <HomePage />
+      </AuthProvider>
+    );
 
     // Header bar elements
     expect(screen.getByText(/ARGON \/\/ 2077/i)).toBeInTheDocument();
@@ -88,7 +93,11 @@ describe('Argon Web App Integration', () => {
   });
 
   it('triggers briefing pipeline when scenario is selected and renders BriefingView', async () => {
-    render(<HomePage />);
+    render(
+      <AuthProvider>
+        <HomePage />
+      </AuthProvider>
+    );
 
     const scenarioCard = screen.getAllByTestId('scenario-card-s1-blast-radius')[0];
     fireEvent.click(scenarioCard);

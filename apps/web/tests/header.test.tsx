@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { ContributorPicker } from '@/components/contributor/contributor-picker';
 import { HeaderBar } from '@/components/navigation/header-bar';
+import { AuthProvider } from '@/app/providers';
 
 describe('ContributorPicker Component', () => {
   it('renders default Guest unassigned state', () => {
@@ -65,12 +66,14 @@ describe('HeaderBar Component', () => {
     const onContributorMock = vi.fn();
 
     render(
-      <HeaderBar
-        currentQuery="billing/retry.ts"
-        onSubmitQuery={onSubmitMock}
-        onSelectWorkspace={onWorkspaceMock}
-        onSelectContributor={onContributorMock}
-      />
+      <AuthProvider>
+        <HeaderBar
+          currentQuery="billing/retry.ts"
+          onSubmitQuery={onSubmitMock}
+          onSelectWorkspace={onWorkspaceMock}
+          onSelectContributor={onContributorMock}
+        />
+      </AuthProvider>
     );
 
     expect(screen.getByText(/ARGON \/\/ 2077/i)).toBeInTheDocument();

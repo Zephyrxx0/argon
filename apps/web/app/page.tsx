@@ -6,6 +6,7 @@ import { ShowcaseHub } from '@/components/hub/showcase-hub';
 import { BriefingView, type WebBriefingResponse } from '@/components/briefing/briefing-view';
 import { HeaderBar } from '@/components/navigation/header-bar';
 import { GraphSyncProvider } from '@/lib/graph-sync';
+import { useAuth } from '@/app/providers';
 import { CytoscapeCanvas, DEFAULT_SHOWCASE_GRAPH } from '@/components/canvas/cytoscape-canvas';
 import { HudControls } from '@/components/canvas/hud-controls';
 import { type Workspace } from '@/components/workspace/workspace-switcher';
@@ -13,6 +14,7 @@ import type { Core } from 'cytoscape';
 import type { CytoscapeElements } from '@argon/graph';
 
 export default function HomePage() {
+  const { getToken } = useAuth();
   const [selectedTask, setSelectedTask] = useState<string>('');
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('ember-adr-showcase');
   const [currentContributorId, setCurrentContributorId] = useState<string | null>(null);
@@ -28,9 +30,15 @@ export default function HomePage() {
     setError(null);
 
     try {
+      const token = await getToken();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const res = await fetch('/api/briefing', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           task,
           workspaceId: currentWorkspaceId,

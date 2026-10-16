@@ -1,10 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Terminal, Database } from 'lucide-react';
 import { CommandBar } from '@/components/command/command-bar';
 import { WorkspaceSwitcher, type Workspace } from '@/components/workspace/workspace-switcher';
 import { ContributorPicker } from '@/components/contributor/contributor-picker';
+import { UserButton } from '@/components/auth/user-button';
+import { AuthModal } from '@/components/auth/auth-modal';
+import { useAuth } from '@/app/providers';
 import { clsx } from 'clsx';
 
 export interface HeaderBarProps {
@@ -32,6 +35,11 @@ export function HeaderBar({
   onSelectContributor,
   className,
 }: HeaderBarProps) {
+  const { user, isAnonymous, isLoading: authLoading } = useAuth();
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+
+  const isAuthenticated = Boolean(user && !isAnonymous);
+
   return (
     <header
       className={clsx(
@@ -63,7 +71,7 @@ export function HeaderBar({
         />
       </div>
 
-      {/* Right: Workspace Switcher & Contributor Identity */}
+      {/* Right: Workspace Switcher, Contributor Identity & Auth Cluster */}
       <div className="flex items-center gap-2 shrink-0">
         <WorkspaceSwitcher
           currentWorkspaceId={currentWorkspaceId}
@@ -75,8 +83,37 @@ export function HeaderBar({
           currentContributorId={currentContributorId}
           onSelectContributor={onSelectContributor}
         />
+
+        {/* Identity Cluster (Immediately to the right of ContributorPicker - D-02) */}
+        {authLoading ? (
+          <div
+            data-testid="auth-skeleton-pill"
+            className="w-20 h-7 bg-muted/40 animate-pulse border border-border"
+          />
+        ) : isAuthenticated ? (
+          <UserButton onOpenAuthModal={() => setAuthModalOpen(true)} />
+        ) : (
+          <div className="flex items-center gap-1.5" data-testid="guest-identity-cluster">
+            <span
+              data-testid="header-guest-pill"
+              className="border border-border bg-muted/30 text-xs px-2 py-1 text-muted-foreground uppercase font-bold"
+            >
+              Guest
+            </span>
+            <button
+              type="button"
+              data-testid="header-signin-button"
+              onClick={() => setAuthModalOpen(true)}
+              className="text-accent border border-accent/40 hover:border-accent hover:bg-accent/10 text-xs px-2.5 py-1 uppercase tracking-wider font-bold transition-colors cursor-pointer"
+            >
+              Sign In
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* In-place Authentication Dialog */}
+      <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />
     </header>
   );
 }
-
