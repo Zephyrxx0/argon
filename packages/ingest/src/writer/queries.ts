@@ -101,3 +101,32 @@ MATCH (d:Decision {id: row.decision_id})
 MATCH (c:Component {name: row.component_name})
 MERGE (d)-[:GOVERNS]->(c)
 `;
+
+export const LINK_USER_TO_PERSONS_QUERY = `
+MERGE (u:User {id: $userId})
+ON CREATE SET u.login = $userLogin
+SET u.login = coalesce(u.login, $userLogin)
+WITH u
+MATCH (p:Person)
+WHERE (p.email IS NOT NULL AND p.email IN $userEmails)
+   OR (p.id IN $userEmailHashes)
+   OR (p.email_hash IS NOT NULL AND p.email_hash IN $userEmailHashes)
+   OR (p.email IS NOT NULL AND p.email ENDS WITH ('+' + $userLogin + '@users.noreply.github.com'))
+   OR (p.email IS NOT NULL AND p.email = ($userLogin + '@users.noreply.github.com'))
+   OR toLower(p.name) = toLower($userLogin)
+   OR toLower(coalesce(p.display_name, '')) = toLower($userLogin)
+MERGE (u)-[r:IDENTIFIES]->(p)
+ON CREATE SET r.created_at = timestamp()
+RETURN count(r) AS linked_count
+`;
+
+export const GET_LINKED_CONTRIBUTORS_QUERY = `
+MATCH (u:User)-[r:IDENTIFIES]->(p:Person)
+RETURN p.id AS person_id,
+       p.name AS name,
+       p.display_name AS display_name,
+       u.id AS user_id,
+       u.login AS login,
+       u.avatar_url AS avatar_url,
+       u.github_id AS github_id
+`;

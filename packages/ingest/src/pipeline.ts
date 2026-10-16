@@ -19,6 +19,9 @@ export interface IngestPipelineConfig {
   keepClone?: boolean;
   client?: ArgonGraphClient;
   installationToken?: string;
+  userId?: string;
+  userLogin?: string;
+  userEmails?: string[];
 }
 
 export interface IngestSummary {
@@ -167,7 +170,14 @@ export async function runIngestion(config: IngestPipelineConfig): Promise<Ingest
         });
       }
     }
-    await writer.writeGovernsEdges(governsEdges);
+    // Stage 8d: Identity Linking (:User)-[:IDENTIFIES]->(:Person) (TENANT-02, D-13, D-14, D-15)
+    if (config.userId && config.userLogin) {
+      await writer.linkUserToMinedPersons(
+        config.userId,
+        config.userLogin,
+        config.userEmails || []
+      );
+    }
 
     // Stage 9: Completed State (1.0)
     await writer.updateJobStatus(jobId, config.repoUrl, 'completed', 1.0);

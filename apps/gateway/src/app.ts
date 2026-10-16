@@ -7,12 +7,16 @@ import { tenantAuthMiddleware } from './middleware/tenant-auth.js';
 import { healthRoute } from './routes/health.js';
 import { queryRoute } from './routes/query.js';
 import { briefingRoute, type BriefingRouteOptions } from './routes/briefing.js';
+import { githubRoute, type GitHubRouteOptions } from './routes/github.js';
+import { GitHubAppService } from './services/github-app.js';
 
 export interface GatewayAppOptions {
   graphClient?: ArgonGraphClient;
   gatewaySecret?: string;
   queryTimeoutMs?: number;
   briefingOptions?: BriefingRouteOptions;
+  githubAppService?: GitHubAppService;
+  githubRouteOptions?: GitHubRouteOptions;
 }
 
 export function createGatewayApp(options?: GatewayAppOptions): Hono {
@@ -27,6 +31,12 @@ export function createGatewayApp(options?: GatewayAppOptions): Hono {
 
   // Authenticated API routes with HS256 JWT verification
   app.use('/api/*', jwtAuthMiddleware(options?.gatewaySecret));
+
+  // GitHub App repository and ingestion routes
+  const githubApp = options?.githubAppService ?? new GitHubAppService();
+  const ghRoute = githubRoute(githubApp, options?.graphClient, options?.githubRouteOptions);
+  app.route('/api/v1/github', ghRoute);
+  app.route('/api/v1/workspaces', ghRoute);
 
   // Pre-query tenant authorization guard and named query routes under /api/v1
   if (options?.graphClient) {

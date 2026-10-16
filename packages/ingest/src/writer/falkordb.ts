@@ -1,6 +1,7 @@
 import type { ArgonGraphClient } from '@argon/graph';
 import * as queries from './queries.js';
 import { redactSecrets } from '../git/redact.js';
+import { hashAuthorEmail } from '../git/author.js';
 
 export class FalkorIngestWriter {
   constructor(
@@ -109,4 +110,45 @@ export class FalkorIngestWriter {
   async writeGovernsEdges(edges: { decision_id: string; component_name: string }[]): Promise<void> {
     await this.writeBatch(queries.BATCH_EDGES_GOVERNS, edges);
   }
+
+  async linkUserToMinedPersons(
+    userId: string,
+    userLogin: string,
+    userEmails: string[] = []
+  ): Promise<{ linkedCount: number }> {
+    return linkUserToMinedPersons(this.client, this.workspaceId, userId, userLogin, userEmails);
+  }
+}
+
+/**
+ * Links an authenticated User node to mined Person nodes via explicit [:IDENTIFIES] edges (TENANT-02, D-13, D-14).
+ * Uses multi-factor matching: verified emails, hashed emails, noreply formats, and login names.
+ */
+export async function linkUserToMinedPersons(
+  client: ArgonGraphClient,
+  workspaceId: string,
+  userId: string,
+  userLogin: string,
+  userEmails: string[] = []
+): Promise<{ linkedCount: number }> {
+  const normalizedLogin = userLogin.trim();
+  const normalizedEmails = userEmails.map((e) => e.toLowerCase().trim()).filter(Boolean);
+
+  const userEmailHashes = normalizedEmails.map(hashAuthorEmail);
+  const noreply1 = `${normalizedLogin}@users.noreply.github.com`.toLowerCase();
+  const noreply2 = `${userId}+${normalizedLogin}@users.noreply.github.com`.toLowerCase();
+  userEmailHashes.push(hashAuthorEmail(noreply1));
+  userEmailHashes.push(hashAuthorEmail(noreply2));
+
+  const result = await client.query(workspaceId, queries.LINK_USER_TO_PERSONS_QUERY, {
+    userId,
+    userLogin: normalizedLogin,
+    userEmails: normalizedEmails,
+    userEmailHashes,
+  });
+
+  const record = (result as any)?.data?.[0] || (result as any)?.records?.[0];
+  const count = record?.linked_count ?? (Array.isArray(record) ? record[0] : 0);
+
+  return { linkedCount: Number(count) || 0 };
 }
