@@ -9,14 +9,17 @@ import { queryRoute } from './routes/query.js';
 import { briefingRoute, type BriefingRouteOptions } from './routes/briefing.js';
 import { githubRoute, type GitHubRouteOptions } from './routes/github.js';
 import { GitHubAppService } from './services/github-app.js';
+import { webhooksRoute, type WebhooksRouteOptions } from './routes/webhooks.js';
 
 export interface GatewayAppOptions {
   graphClient?: ArgonGraphClient;
   gatewaySecret?: string;
+  webhookSecret?: string;
   queryTimeoutMs?: number;
   briefingOptions?: BriefingRouteOptions;
   githubAppService?: GitHubAppService;
   githubRouteOptions?: GitHubRouteOptions;
+  webhooksOptions?: WebhooksRouteOptions;
 }
 
 export function createGatewayApp(options?: GatewayAppOptions): Hono {
@@ -37,6 +40,14 @@ export function createGatewayApp(options?: GatewayAppOptions): Hono {
   const ghRoute = githubRoute(githubApp, options?.graphClient, options?.githubRouteOptions);
   app.route('/api/v1/github', ghRoute);
   app.route('/api/v1/workspaces', ghRoute);
+
+  // Webhook receiver routes
+  const whRoute = webhooksRoute({
+    graphClient: options?.graphClient,
+    webhookSecret: options?.webhookSecret,
+    ...options?.webhooksOptions,
+  });
+  app.route('/api/v1/webhooks', whRoute);
 
   // Pre-query tenant authorization guard and named query routes under /api/v1
   if (options?.graphClient) {

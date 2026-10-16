@@ -8,6 +8,10 @@ export function jwtAuthMiddleware(secretOverride?: string): MiddlewareHandler {
   return async (c, next) => {
     const secret = secretOverride ?? process.env.BETTER_AUTH_SECRET ?? process.env.GATEWAY_SECRET;
 
+    if (c.req.path.startsWith('/api/v1/webhooks')) {
+      return await next();
+    }
+
     if (!secret || secret.trim() === '') {
       const errorResponse: GatewayErrorResponse = {
         error: 'Server authentication unconfigured',
