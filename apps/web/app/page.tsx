@@ -1,12 +1,18 @@
 'use client';
 
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { SplitViewport } from '@/components/layout/split-viewport';
 import { ShowcaseHub } from '@/components/hub/showcase-hub';
 import { BriefingView, type WebBriefingResponse } from '@/components/briefing/briefing-view';
 import { HeaderBar } from '@/components/navigation/header-bar';
 import { GraphSyncProvider } from '@/lib/graph-sync';
 import { useAuth } from '@/app/providers';
+import {
+  getStoredPreferences,
+  saveStoredPreferences,
+  addQueryToHistory,
+  type ArgonUiPreferences,
+} from '@/lib/preferences';
 import { CytoscapeCanvas, DEFAULT_SHOWCASE_GRAPH } from '@/components/canvas/cytoscape-canvas';
 import { HudControls } from '@/components/canvas/hud-controls';
 import { type Workspace } from '@/components/workspace/workspace-switcher';
@@ -14,15 +20,51 @@ import type { Core } from 'cytoscape';
 import type { CytoscapeElements } from '@argon/graph';
 
 export default function HomePage() {
-  const { getToken } = useAuth();
+  const { getToken, activeWorkspace, setActiveWorkspace } = useAuth();
   const [selectedTask, setSelectedTask] = useState<string>('');
-  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('ember-adr-showcase');
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>(activeWorkspace || 'ember-adr-showcase');
   const [currentContributorId, setCurrentContributorId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [briefingResponse, setBriefingResponse] = useState<WebBriefingResponse | null>(null);
+  const [uiPreferences, setUiPreferences] = useState<ArgonUiPreferences>(() => getStoredPreferences());
 
   const cyRef = useRef<Core | null>(null);
+
+  // Sync workspace from AuthProvider state (D-15)
+  useEffect(() => {
+    if (activeWorkspace) {
+      setCurrentWorkspaceId(activeWorkspace);
+    }
+  }, [activeWorkspace]);
+
+  // Listen for reset-workspace custom events (D-15)
+  useEffect(() => {
+    const handleResetWorkspace = (e: Event) => {
+      const customEvent = e as CustomEvent<{ workspaceId?: string }>;
+      const targetWs = customEvent.detail?.workspaceId || 'ember-adr-showcase';
+      setCurrentWorkspaceId(targetWs);
+      if (setActiveWorkspace) {
+        setActiveWorkspace(targetWs);
+      }
+      setBriefingResponse(null);
+      setError(null);
+    };
+    window.addEventListener('argon:reset-workspace', handleResetWorkspace);
+    return () => window.removeEventListener('argon:reset-workspace', handleResetWorkspace);
+  }, [setActiveWorkspace]);
+
+  // Hydrate preferences on mount
+  useEffect(() => {
+    setUiPreferences(getStoredPreferences());
+  }, []);
+
+  const handleSelectWorkspace = (wsId: string) => {
+    setCurrentWorkspaceId(wsId);
+    if (setActiveWorkspace) {
+      setActiveWorkspace(wsId);
+    }
+  };
 
   const executeBriefing = async (task: string) => {
     setSelectedTask(task);
@@ -48,7 +90,25 @@ export default function HomePage() {
 
       const data = await res.json();
       if (!res.ok) {
-        if (res.status === 503) {
+        if (res.status === 403) {
+          setBriefingResponse({
+            status: 'FORBIDDEN' as any,
+            reason:
+              data.error ||
+              `Workspace access denied: You do not have permissions for workspace '${currentWorkspaceId}'. Request access from the workspace owner or switch to a showcase workspace.`,
+            briefing: null,
+            workspaceId: currentWorkspaceId,
+            evidence: { nodeCount: 0, verifiedCitationCount: 0 },
+          } as any);
+        } else if (res.status === 404) {
+          setBriefingResponse({
+            status: 'NOT_FOUND' as any,
+            reason: data.error || `Workspace '${currentWorkspaceId}' not found.`,
+            briefing: null,
+            workspaceId: currentWorkspaceId,
+            evidence: { nodeCount: 0, verifiedCitationCount: 0 },
+          } as any);
+        } else if (res.status === 503) {
           setBriefingResponse({
             status: 'FALKORDB_TIMEOUT',
             reason: data.reason || 'FalkorDB Graph Unreachable (503): Database connection timed out.',
@@ -74,15 +134,19 @@ export default function HomePage() {
   };
 
   const handleSelectScenario = (query: string) => {
+    addQueryToHistory(query);
+    setUiPreferences(getStoredPreferences());
     executeBriefing(query);
   };
 
   const handleQuerySubmit = (query: string) => {
+    addQueryToHistory(query);
+    setUiPreferences(getStoredPreferences());
     executeBriefing(query);
   };
 
   const handleIngestSuccess = (newWorkspace: Workspace) => {
-    setCurrentWorkspaceId(newWorkspace.id);
+    handleSelectWorkspace(newWorkspace.id);
   };
 
   const handleRetryConnection = () => {
@@ -206,7 +270,7 @@ export default function HomePage() {
           error={error}
           onSubmitQuery={handleQuerySubmit}
           currentWorkspaceId={currentWorkspaceId}
-          onSelectWorkspace={setCurrentWorkspaceId}
+          onSelectWorkspace={handleSelectWorkspace}
           onIngestSuccess={handleIngestSuccess}
           currentContributorId={currentContributorId}
           onSelectContributor={setCurrentContributorId}
@@ -215,6 +279,7 @@ export default function HomePage() {
         {/* Main Dual-Pane Resizable Viewport */}
         <div className="flex-1 overflow-hidden">
           <SplitViewport
+            defaultLayout={uiPreferences.split_viewport_sizes || [45, 55]}
             leftPanel={
               <div className="h-full bg-background">
                 {isLoading || briefingResponse ? (
@@ -222,6 +287,7 @@ export default function HomePage() {
                     response={briefingResponse}
                     isLoading={isLoading}
                     onRetryConnection={handleRetryConnection}
+                    onSelectWorkspace={handleSelectWorkspace}
                   />
                 ) : (
                   <ShowcaseHub onSelectScenario={handleSelectScenario} />

@@ -8,6 +8,8 @@ export interface AuthContextValue {
   user: any;
   isAnonymous: boolean;
   isLoading: boolean;
+  activeWorkspace: string;
+  setActiveWorkspace: (workspaceId: string) => void;
   getToken: () => Promise<string | null>;
   signInWithGithub: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -18,6 +20,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { data: sessionData, isPending } = useSession();
   const [cachedToken, setCachedToken] = useState<string | null>(null);
+  const [activeWorkspace, setActiveWorkspace] = useState<string>('ember-adr-showcase');
   const hasRequestedGuestRef = useRef(false);
 
   // Mint anonymous session on first load if no session exists (AUTH-02, D-04, D-06)
@@ -63,12 +66,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleSignOut = useCallback(async () => {
-    await authClient.signOut();
+    try {
+      await authClient.signOut();
+    } catch (err) {
+      console.error('[AuthProvider] Error during signOut:', err);
+    }
     // D-15: Mint a fresh anonymous session immediately after logout
     hasRequestedGuestRef.current = false;
-    await authClient.signIn.anonymous();
+    try {
+      await authClient.signIn.anonymous();
+    } catch (err) {
+      console.error('[AuthProvider] Error minting anonymous session after signOut:', err);
+    }
+    setCachedToken(null);
+    setActiveWorkspace('ember-adr-showcase');
+
+    // Dispatch workspace reset event to subscribers without clearing UI preferences
     if (typeof window !== 'undefined') {
-      window.location.href = '/';
+      window.dispatchEvent(
+        new CustomEvent('argon:reset-workspace', {
+          detail: { workspaceId: 'ember-adr-showcase' },
+        })
+      );
     }
   }, []);
 
@@ -81,6 +100,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user: sessionData?.user ?? null,
         isAnonymous,
         isLoading: isPending,
+        activeWorkspace,
+        setActiveWorkspace,
         getToken,
         signInWithGithub,
         signOut: handleSignOut,
