@@ -179,3 +179,4 @@
 - **ORG-01 (v3.0):** Multi-user organization team spaces with role-based access control (Admin, Member, Viewer).
 - **CROSS-01 (v3.0):** Cross-repository multi-graph dependency and shared library impact analysis.
 - **SLACK-01 (v3.0):** Slack bot integration triggering Argon briefings directly from PR comments.
+
