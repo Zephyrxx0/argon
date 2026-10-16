@@ -8,7 +8,7 @@ describe('Guest Account Linking & Graph Migration', () => {
     const executedQueries: Array<{ cypher: string; params: any }> = [];
 
     const mockClient = {
-      query: vi.fn().mockImplementation(async (workspace: string, cypher: string, params: any) => {
+      query: vi.fn().mockImplementation(async (_workspace: string, cypher: string, params: any) => {
         executedQueries.push({ cypher, params });
         return { data: [{ migratedCount: 3 }] };
       }),
@@ -41,7 +41,7 @@ describe('Guest Account Linking & Graph Migration', () => {
     const executedQueries: Array<{ cypher: string; params: any }> = [];
 
     const mockClient = {
-      query: vi.fn().mockImplementation(async (workspace: string, cypher: string, params: any) => {
+      query: vi.fn().mockImplementation(async (_workspace: string, cypher: string, params: any) => {
         executedQueries.push({ cypher, params });
         if (cypher.includes('count(w) AS migratedCount')) {
           return { data: [{ migratedCount: 0 }] };

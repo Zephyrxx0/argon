@@ -1,6 +1,6 @@
 import type { MiddlewareHandler } from 'hono';
 import type { ArgonGraphClient } from '@argon/graph';
-import { checkWorkspaceAccess } from '@argon/graph';
+import { checkWorkspaceAccess, FalkorUnavailableError } from '@argon/graph';
 import { ErrorCodes, type GatewayErrorResponse, type JwtAuthUser } from '../types.js';
 
 /**
@@ -45,8 +45,21 @@ export function tenantAuthMiddleware(graphClient: ArgonGraphClient): MiddlewareH
 
       await next();
     } catch (err: any) {
+      if (
+        err instanceof FalkorUnavailableError ||
+        err?.message?.includes('FalkorDB is unavailable') ||
+        err?.message?.includes('ECONNREFUSED') ||
+        err?.code === 'ECONNREFUSED'
+      ) {
+        const errorResponse: GatewayErrorResponse = {
+          error: 'FalkorDB is unreachable',
+          code: ErrorCodes.FALKORDB_UNREACHABLE,
+        };
+        return c.json(errorResponse, 503);
+      }
+
       const errorResponse: GatewayErrorResponse = {
-        error: err?.message ?? 'Authorization check failed',
+        error: 'Internal authorization error',
         code: ErrorCodes.INTERNAL_ERROR,
       };
       return c.json(errorResponse, 500);

@@ -67,7 +67,13 @@ db.exec(`
 `);
 
 const baseURL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-const secretKey = process.env.BETTER_AUTH_SECRET || 'argon-dev-secret-at-least-32-chars-long';
+const secretKey =
+  process.env.BETTER_AUTH_SECRET ||
+  (process.env.NODE_ENV === 'production'
+    ? (() => {
+        throw new Error('BETTER_AUTH_SECRET environment variable is required in production');
+      })()
+    : 'argon-dev-secret-at-least-32-chars-long');
 
 export const auth = betterAuth({
   database: db,

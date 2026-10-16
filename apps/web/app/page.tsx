@@ -9,7 +9,6 @@ import { GraphSyncProvider } from '@/lib/graph-sync';
 import { useAuth } from '@/app/providers';
 import {
   getStoredPreferences,
-  saveStoredPreferences,
   addQueryToHistory,
   type ArgonUiPreferences,
 } from '@/lib/preferences';
@@ -64,6 +63,8 @@ export default function HomePage() {
     if (setActiveWorkspace) {
       setActiveWorkspace(wsId);
     }
+    setBriefingResponse(null);
+    setError(null);
   };
 
   const executeBriefing = async (task: string) => {
