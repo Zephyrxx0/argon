@@ -112,6 +112,10 @@ export const auth = betterAuth({
     github: {
       clientId: process.env.GITHUB_CLIENT_ID || '',
       clientSecret: process.env.GITHUB_CLIENT_SECRET || '',
+      // `repo` is required to LIST and CLONE the user's private repositories via their OAuth
+      // token. Argon only ever reads (list + git clone); it never writes. Classic GitHub OAuth
+      // offers no read-only-private scope, so this is the narrowest option that includes private.
+      scope: ['repo'],
       // Persist the GitHub *login* (handle) as the user's name and the avatar as the image.
       // Without this, Better Auth stores `profile.name` (the display name, e.g. "Ayush"), so the
       // UI shows a name instead of the handle and avatar derivation is unreliable.
