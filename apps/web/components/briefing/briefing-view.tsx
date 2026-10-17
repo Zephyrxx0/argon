@@ -1,14 +1,17 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import type { Briefing } from '@argon/agent';
+import type { Briefing, CodeOwnerItem, EvidenceSource, ToolSelectionSummary, ToolTraceEntry, Verdict } from '@argon/agent';
 import { StickyJumpBar, type SectionCitationCounts } from './sticky-jump-bar';
 import { EvidenceCard } from './evidence-card';
 import { KillSwitchCard } from './kill-switch-card';
 import { ForbiddenCard, NotFoundCard } from './forbidden-card';
-import { Loader2, Layers, GitFork, Users, ShieldAlert, History } from 'lucide-react';
+import { VerdictCard } from './verdict-card';
+import { ToolTracePanel } from './tool-trace';
+import { Loader2, Layers, GitFork, Users, ShieldAlert, History, GitPullRequest, CircleDot } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useGraphSync } from '@/lib/graph-sync';
+import { citationLinks, decisionProvenance, ownersOfRecord, sourceChipLabel } from '@/lib/briefing-sources';
 
 export interface WebBriefingResponse {
   status:
@@ -30,6 +33,15 @@ export interface WebBriefingResponse {
   } | null;
   reason?: string;
   workspaceId?: string;
+  /** Deterministic PROCEED / REVIEW / HOLD verdict computed from graph facts. */
+  verdict?: Verdict | null;
+  /** Every graph tool call behind the briefing (pipeline + LLM-selected). */
+  toolTrace?: ToolTraceEntry[] | null;
+  toolSelection?: ToolSelectionSummary | null;
+  /** Clickable origins (commit / ADR / pull request / issue) of the cited nodes, from graph properties. */
+  sources?: EvidenceSource[] | null;
+  /** CODEOWNERS owners of record for the components in scope. */
+  codeOwners?: CodeOwnerItem[] | null;
 }
 
 export interface BriefingViewProps {
@@ -197,6 +209,11 @@ export function BriefingView({
     0
   );
 
+  // People who already have a card (with an "owner of record" flag) are not listed twice
+  const ownersWithoutCard = (response?.codeOwners ?? []).filter(
+    (o) => !briefing.keyOwners.some((k) => k.personId === o.ownerId)
+  );
+
   const counts: SectionCitationCounts = {
     summary: summaryCitationCount,
     blastRadius: blastRadiusCitationCount,
@@ -237,8 +254,11 @@ export function BriefingView({
       <StickyJumpBar counts={counts} />
 
       <div className="p-4 sm:p-6 space-y-8">
+        {/* GRAPH VERDICT (deterministic, from graph facts) */}
+        {response?.verdict && <VerdictCard verdict={response.verdict} />}
+
         {/* SECTION 1: SUMMARY */}
-        <section id="sec-summary" className="space-y-4 scroll-mt-14">
+        <section id="sec-summary" className="space-y-4 scroll-mt-24">
           <div className="flex items-center justify-between border-b border-border/80 pb-2">
             <div className="flex items-center gap-2 text-xs font-bold text-accent uppercase tracking-wider">
               <Layers className="w-4 h-4 text-accent" />
@@ -273,7 +293,23 @@ export function BriefingView({
                       className="text-xs text-muted-foreground leading-relaxed flex items-start gap-2"
                     >
                       <span className="text-accent mt-0.5 font-bold">•</span>
-                      <span>{takeaway.claim}</span>
+                      <span className="space-x-2">
+                        <span>{takeaway.claim}</span>
+                        {citationLinks(response?.sources, takeaway.citedNodeIds).map((src) => (
+                          <a
+                            key={`${src.kind}:${src.url}`}
+                            href={src.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            data-testid="takeaway-source-link"
+                            title={src.label}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 border border-border bg-background/50 text-[10px] text-foreground hover:border-accent hover:text-accent transition-colors align-middle"
+                          >
+                            {src.kind === 'issue' ? <CircleDot className="w-3 h-3" /> : <GitPullRequest className="w-3 h-3" />}
+                            <span>{sourceChipLabel(src)}</span>
+                          </a>
+                        ))}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -283,7 +319,7 @@ export function BriefingView({
         </section>
 
         {/* SECTION 2: BLAST RADIUS */}
-        <section id="sec-blast-radius" className="space-y-4 scroll-mt-14">
+        <section id="sec-blast-radius" className="space-y-4 scroll-mt-24">
           <div className="flex items-center justify-between border-b border-border/80 pb-2">
             <div className="flex items-center gap-2 text-xs font-bold text-accent uppercase tracking-wider">
               <GitFork className="w-4 h-4 text-accent" />
@@ -324,7 +360,7 @@ export function BriefingView({
         </section>
 
         {/* SECTION 3: KEY OWNERS */}
-        <section id="sec-key-owners" className="space-y-4 scroll-mt-14">
+        <section id="sec-key-owners" className="space-y-4 scroll-mt-24">
           <div className="flex items-center justify-between border-b border-border/80 pb-2">
             <div className="flex items-center gap-2 text-xs font-bold text-accent uppercase tracking-wider">
               <Users className="w-4 h-4 text-accent" />
@@ -341,27 +377,52 @@ export function BriefingView({
                 None recorded in active graph
               </div>
             ) : (
-              briefing.keyOwners.map((owner, idx) => (
-                <EvidenceCard
-                  key={`owner-${idx}-${owner.personId}`}
-                  id={owner.personId}
-                  type="PERSON"
-                  title={owner.name}
-                  description={`Role: ${owner.role.toUpperCase()} in ${owner.component}. Authored: ${owner.authoredCount} commits, Reviewed: ${owner.reviewedCount} PRs.`}
-                  properties={{
-                    Role: owner.role.toUpperCase(),
-                    Component: owner.component,
-                    Commits: owner.authoredCount,
-                    Reviews: owner.reviewedCount,
-                  }}
-                />
-              ))
+              briefing.keyOwners.map((owner, idx) => {
+                const isOwner =
+                  ownersOfRecord(response?.codeOwners, owner.component).some((o) => o.ownerId === owner.personId);
+                return (
+                  <EvidenceCard
+                    key={`owner-${idx}-${owner.personId}`}
+                    id={owner.personId}
+                    type="PERSON"
+                    title={owner.name}
+                    hideValidity
+                    description={`Role: ${owner.role.toUpperCase()} in ${owner.component}. Authored: ${owner.authoredCount} PRs/commits, Reviewed: ${owner.reviewedCount} PRs.${isOwner ? ' Owner of record (CODEOWNERS).' : ''}`}
+                    properties={{
+                      Role: owner.role.toUpperCase(),
+                      Component: owner.component,
+                      Authored: owner.authoredCount,
+                      Reviews: owner.reviewedCount,
+                      ...(isOwner ? { 'Owner of record': 'CODEOWNERS' } : {}),
+                    }}
+                  />
+                );
+              })
             )}
           </div>
+
+          {ownersWithoutCard.length > 0 && (
+            <div data-testid="owners-of-record" className="space-y-3 pt-2">
+              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                Owners of record (CODEOWNERS)
+              </span>
+              {ownersWithoutCard.map((o) => (
+                <EvidenceCard
+                  key={`codeowner-${o.ownerId}-${o.component}`}
+                  id={o.ownerId}
+                  type={o.kind === 'team' ? 'TEAM' : 'PERSON'}
+                  title={o.name}
+                  hideValidity
+                  description={`Owns ${o.component} per CODEOWNERS${o.pattern ? ` (${o.pattern})` : ''}.`}
+                  properties={{ Component: o.component, ...(o.pattern ? { Pattern: o.pattern } : {}) }}
+                />
+              ))}
+            </div>
+          )}
         </section>
 
         {/* SECTION 4: CONSTRAINING DECISIONS */}
-        <section id="sec-decisions" className="space-y-4 scroll-mt-14">
+        <section id="sec-decisions" className="space-y-4 scroll-mt-24">
           <div className="flex items-center justify-between border-b border-border/80 pb-2">
             <div className="flex items-center gap-2 text-xs font-bold text-accent uppercase tracking-wider">
               <ShieldAlert className="w-4 h-4 text-warning" />
@@ -378,26 +439,31 @@ export function BriefingView({
                 None recorded in active graph
               </div>
             ) : (
-              briefing.constrainingDecisions.map((dec, idx) => (
-                <EvidenceCard
-                  key={`decision-${idx}-${dec.decisionId}`}
-                  id={dec.decisionId}
-                  type="DECISION"
-                  title={dec.title}
-                  description={dec.constraint}
-                  validity="VALID"
-                  properties={{
-                    Status: dec.status,
-                    Component: dec.component,
-                  }}
-                />
-              ))
+              briefing.constrainingDecisions.map((dec, idx) => {
+                const prov = decisionProvenance(response?.sources, dec.decisionId);
+                return (
+                  <EvidenceCard
+                    key={`decision-${idx}-${dec.decisionId}`}
+                    id={dec.decisionId}
+                    type="DECISION"
+                    title={dec.title}
+                    description={dec.constraint}
+                    validity="VALID"
+                    sourceUrl={prov.origin?.url}
+                    links={prov.links.map((l) => ({ kind: l.kind as any, label: l.label, url: l.url!, state: l.state }))}
+                    properties={{
+                      Status: dec.status,
+                      Component: dec.component,
+                    }}
+                  />
+                );
+              })
             )}
           </div>
         </section>
 
         {/* SECTION 5: PRECEDENTS */}
-        <section id="sec-precedents" className="space-y-4 scroll-mt-14">
+        <section id="sec-precedents" className="space-y-4 scroll-mt-24">
           <div className="flex items-center justify-between border-b border-border/80 pb-2">
             <div className="flex items-center gap-2 text-xs font-bold text-accent uppercase tracking-wider">
               <History className="w-4 h-4 text-muted-foreground" />
@@ -414,25 +480,38 @@ export function BriefingView({
                 None recorded in active graph
               </div>
             ) : (
-              briefing.precedents.map((prec, idx) => (
-                <EvidenceCard
-                  key={`prec-${idx}-${prec.decisionId}`}
-                  id={prec.decisionId}
-                  type="DECISION"
-                  title={prec.title}
-                  description={prec.relevance}
-                  validity="SUPERSEDED"
-                  properties={{
-                    Relevance: prec.relevance,
-                    ...(prec.similarityScore !== undefined
-                      ? { 'Similarity Score': prec.similarityScore.toFixed(2) }
-                      : {}),
-                  }}
-                />
-              ))
+              briefing.precedents.map((prec, idx) => {
+                const prov = decisionProvenance(response?.sources, prec.decisionId);
+                return (
+                  <EvidenceCard
+                    key={`prec-${idx}-${prec.decisionId}`}
+                    id={prec.decisionId}
+                    type="DECISION"
+                    title={prec.title}
+                    description={prec.relevance}
+                    validity="SUPERSEDED"
+                    sourceUrl={prov.origin?.url}
+                    links={prov.links.map((l) => ({ kind: l.kind as any, label: l.label, url: l.url!, state: l.state }))}
+                    properties={{
+                      Relevance: prec.relevance,
+                      ...(prec.similarityScore !== undefined
+                        ? { 'Similarity Score': prec.similarityScore.toFixed(2) }
+                        : {}),
+                    }}
+                  />
+                );
+              })
             )}
           </div>
         </section>
+
+        {/* SECTION 6: GRAPH TOOLS CALLED (explainability) */}
+        {response?.toolTrace && response.toolTrace.length > 0 && (
+          <ToolTracePanel
+            trace={response.toolTrace}
+            selection={response.toolSelection ?? undefined}
+          />
+        )}
       </div>
     </div>
   );
