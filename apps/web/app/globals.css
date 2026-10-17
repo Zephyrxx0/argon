@@ -1,43 +1,144 @@
 @import "tailwindcss";
 
+/*
+ * Argon design tokens — brutalist monochrome.
+ * Black is the surface, white is the accent. Colour is reserved for STATE only:
+ * success (verified), warning (degraded / stale), danger (failure / forbidden).
+ */
 @theme {
-  --color-background: #090a0f;
-  --color-foreground: #e6edf3;
-  --color-card: #0d1117;
-  --color-card-foreground: #e6edf3;
-  --color-muted: #161b22;
-  --color-muted-foreground: #8b949e;
-  --color-border: #30363d;
-  --color-primary: #00f0ff;
-  --color-primary-foreground: #090a0f;
-  --color-accent: #00f0ff;
-  --color-accent-foreground: #090a0f;
-  --color-destructive: #ff0055;
-  --color-destructive-foreground: #ffffff;
-  --color-warning: #ffb800;
-  --color-danger: #ff0055;
+  --color-background: #000000;
+  --color-foreground: #ffffff;
+  --color-card: #000000;
+  --color-card-foreground: #ffffff;
+  --color-muted: #0c0c0c;
+  --color-muted-foreground: #8f8f8f;
+  --color-border: #2b2b2b;
+  --color-border-strong: #ffffff;
+  --color-primary: #ffffff;
+  --color-primary-foreground: #000000;
+  --color-accent: #ffffff;
+  --color-accent-foreground: #000000;
+
+  /* State colours — the only chroma allowed in the UI */
+  --color-success: #3ddc84;
+  --color-warning: #ffb020;
+  --color-danger: #ff4d4d;
+  --color-destructive: #ff4d4d;
+  --color-destructive-foreground: #000000;
+
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --font-display: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif;
 }
 
 :root {
-  --background: #090a0f;
-  --foreground: #e6edf3;
-  --card: #0d1117;
-  --card-foreground: #e6edf3;
-  --border: #30363d;
-  --primary: #00f0ff;
-  --primary-foreground: #090a0f;
-  --destructive: #ff0055;
-  --destructive-foreground: #ffffff;
-  --muted: #161b22;
-  --muted-foreground: #8b949e;
-  --accent: #00f0ff;
-  --accent-foreground: #090a0f;
-  --bg-grid: rgba(255, 255, 255, 0.03);
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #000000;
+  --card-foreground: #ffffff;
+  --border: #2b2b2b;
+  --primary: #ffffff;
+  --primary-foreground: #000000;
+  --destructive: #ff4d4d;
+  --destructive-foreground: #000000;
+  --muted: #0c0c0c;
+  --muted-foreground: #8f8f8f;
+  --accent: #ffffff;
+  --accent-foreground: #000000;
+  color-scheme: dark;
+}
+
+html {
+  background: #000;
 }
 
 body {
   background-color: var(--color-background);
   color: var(--color-foreground);
   font-family: var(--font-mono);
+}
+
+::selection {
+  background: #fff;
+  color: #000;
+}
+
+/* Brutalist scrollbars: flat, square, high-contrast */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #444 #000;
+}
+
+/* Keyboard focus ring — but not on the command-palette input, which styles its own container */
+:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+[data-command-input]:focus,
+[data-command-input]:focus-visible {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ───────── Graph canvas (React Flow) ───────── */
+@keyframes argon-edge-march {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+.argon-edge-march {
+  animation: argon-edge-march 0.9s linear infinite;
+}
+
+@keyframes argon-pulse {
+  0%,
+  100% {
+    outline: 0 solid rgba(255, 255, 255, 0);
+  }
+  50% {
+    outline: 6px solid rgba(255, 255, 255, 0.55);
+  }
+}
+.argon-pulse {
+  animation: argon-pulse 0.8s ease-in-out 2;
+  outline-offset: 2px;
+}
+
+/* React Flow chrome → brutalist */
+.react-flow {
+  --xy-background-color: #000;
+  --xy-node-border-radius: 0;
+  --xy-minimap-background-color: #000;
+}
+.react-flow__node {
+  cursor: pointer;
+}
+.react-flow__node:focus-visible .argon-node {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+.react-flow__attribution {
+  background: transparent !important;
+  color: #555 !important;
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+.react-flow__attribution a {
+  color: #777 !important;
+}
+
+/* While the command palette is open, the graph canvas (and its floating HUD / inspector) sits
+   behind the overlay: push it down, blur it, and make it non-interactive. */
+body[data-command-palette-open='true'] [data-testid='graph-canvas'] {
+  filter: blur(2px);
+  pointer-events: none;
+  user-select: none;
 }

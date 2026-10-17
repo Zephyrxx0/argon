@@ -1,4 +1,4 @@
-export interface Theme2077Tokens {
+export interface ThemeTokens {
   background: string;
   foreground: string;
   muted: string;
@@ -6,6 +6,7 @@ export interface Theme2077Tokens {
   border: string;
   accent: string;
   accentForeground: string;
+  success: string;
   warning: string;
   danger: string;
   card: string;
@@ -16,31 +17,36 @@ export interface Theme2077Tokens {
   nodeDecision: string;
 }
 
-export const DEFAULT_2077_THEME: Theme2077Tokens = {
-  background: '#090a0f',
-  foreground: '#e6edf3',
-  muted: '#161b22',
-  mutedForeground: '#8b949e',
-  border: '#30363d',
-  accent: '#00f0ff',
-  accentForeground: '#090a0f',
-  warning: '#ffb800',
-  danger: '#ff0055',
-  card: '#0d1117',
-  cardForeground: '#c9d1d9',
-  nodeFile: '#58a6ff',
-  nodePerson: '#bc8cff',
-  nodeComponent: '#00f0ff',
-  nodeDecision: '#ffb800',
+/**
+ * Brutalist monochrome palette. Node types are told apart by shape and
+ * brightness; chroma is reserved for state (success / warning / danger).
+ */
+export const DEFAULT_THEME: ThemeTokens = {
+  background: '#000000',
+  foreground: '#ffffff',
+  muted: '#0c0c0c',
+  mutedForeground: '#8f8f8f',
+  border: '#2b2b2b',
+  accent: '#ffffff',
+  accentForeground: '#000000',
+  success: '#3ddc84',
+  warning: '#ffb020',
+  danger: '#ff4d4d',
+  card: '#000000',
+  cardForeground: '#ffffff',
+  nodeFile: '#8f8f8f',
+  nodePerson: '#cfcfcf',
+  nodeComponent: '#ffffff',
+  nodeDecision: '#ffffff',
 };
 
 /**
- * Safely extracts 2077 theme tokens from DOM computed styles at runtime,
- * falling back to the standard 2077 cyberpunk design system constants.
+ * Reads theme tokens from the DOM's computed styles at runtime,
+ * falling back to the static monochrome palette (SSR / tests).
  */
-export function get2077ThemeTokens(): Theme2077Tokens {
+export function getThemeTokens(): ThemeTokens {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
-    return { ...DEFAULT_2077_THEME };
+    return { ...DEFAULT_THEME };
   }
 
   try {
@@ -51,24 +57,24 @@ export function get2077ThemeTokens(): Theme2077Tokens {
     };
 
     return {
-      background: getVar('--color-background', DEFAULT_2077_THEME.background),
-      foreground: getVar('--color-foreground', DEFAULT_2077_THEME.foreground),
-      muted: getVar('--color-muted', DEFAULT_2077_THEME.muted),
-      mutedForeground: getVar('--color-muted-foreground', DEFAULT_2077_THEME.mutedForeground),
-      border: getVar('--color-border', DEFAULT_2077_THEME.border),
-      accent: getVar('--color-accent', DEFAULT_2077_THEME.accent),
-      accentForeground: getVar('--color-accent-foreground', DEFAULT_2077_THEME.accentForeground),
-      warning: getVar('--color-warning', DEFAULT_2077_THEME.warning),
-      danger: getVar('--color-danger', DEFAULT_2077_THEME.danger),
-      card: getVar('--color-card', DEFAULT_2077_THEME.card),
-      cardForeground: getVar('--color-card-foreground', DEFAULT_2077_THEME.cardForeground),
-      nodeFile: getVar('--color-node-file', DEFAULT_2077_THEME.nodeFile),
-      nodePerson: getVar('--color-node-person', DEFAULT_2077_THEME.nodePerson),
-      nodeComponent: getVar('--color-accent', DEFAULT_2077_THEME.nodeComponent),
-      nodeDecision: getVar('--color-warning', DEFAULT_2077_THEME.nodeDecision),
+      background: getVar('--color-background', DEFAULT_THEME.background),
+      foreground: getVar('--color-foreground', DEFAULT_THEME.foreground),
+      muted: getVar('--color-muted', DEFAULT_THEME.muted),
+      mutedForeground: getVar('--color-muted-foreground', DEFAULT_THEME.mutedForeground),
+      border: getVar('--color-border', DEFAULT_THEME.border),
+      accent: getVar('--color-accent', DEFAULT_THEME.accent),
+      accentForeground: getVar('--color-accent-foreground', DEFAULT_THEME.accentForeground),
+      success: getVar('--color-success', DEFAULT_THEME.success),
+      warning: getVar('--color-warning', DEFAULT_THEME.warning),
+      danger: getVar('--color-danger', DEFAULT_THEME.danger),
+      card: getVar('--color-card', DEFAULT_THEME.card),
+      cardForeground: getVar('--color-card-foreground', DEFAULT_THEME.cardForeground),
+      nodeFile: getVar('--color-node-file', DEFAULT_THEME.nodeFile),
+      nodePerson: getVar('--color-node-person', DEFAULT_THEME.nodePerson),
+      nodeComponent: getVar('--color-node-component', DEFAULT_THEME.nodeComponent),
+      nodeDecision: getVar('--color-node-decision', DEFAULT_THEME.nodeDecision),
     };
   } catch {
-    return { ...DEFAULT_2077_THEME };
+    return { ...DEFAULT_THEME };
   }
 }
-
