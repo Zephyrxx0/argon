@@ -51,6 +51,58 @@ export function BriefingView({
   onRefreshBriefing,
   className,
 }: BriefingViewProps) {
+  // Hooks first: they must run in the same order on every render, whichever state is shown below
+  const briefing = response?.briefing;
+  const { lastSyncEvent } = useGraphSync();
+  const handleReRun = onReRunBriefing ?? onRefreshBriefing;
+
+  const allCitedIds = useMemo(() => {
+    if (!briefing) return [];
+    const ids = new Set<string>();
+    if (response?.evidence?.verifiedNodeIds) {
+      for (const id of response.evidence.verifiedNodeIds) ids.add(id);
+    }
+    for (const t of briefing.summary?.keyTakeaways || []) {
+      for (const id of t.citedNodeIds || []) ids.add(id);
+    }
+    for (const c of briefing.blastRadius?.affectedComponents || []) {
+      for (const id of c.citedNodeIds || []) ids.add(id);
+    }
+    for (const o of briefing.keyOwners || []) {
+      for (const id of o.citedNodeIds || []) ids.add(id);
+    }
+    for (const d of briefing.constrainingDecisions || []) {
+      for (const id of d.citedNodeIds || []) ids.add(id);
+    }
+    for (const p of briefing.precedents || []) {
+      for (const id of p.citedNodeIds || []) ids.add(id);
+    }
+    return Array.from(ids);
+  }, [briefing, response?.evidence?.verifiedNodeIds]);
+
+  const isStale = useMemo(() => {
+    if (!lastSyncEvent || allCitedIds.length === 0) return false;
+    const updatedFiles = new Set(lastSyncEvent.updated.files);
+    const updatedDecisions = new Set(lastSyncEvent.updated.decisions);
+    const supersededDecisions = new Set(lastSyncEvent.superseded);
+
+    for (const id of allCitedIds) {
+      const cleanId = id.replace(/^(f:|file:|d:|dec:|cm:|commit:)/, '');
+      if (
+        updatedFiles.has(id) ||
+        updatedFiles.has(cleanId) ||
+        updatedDecisions.has(id) ||
+        updatedDecisions.has(cleanId) ||
+        supersededDecisions.has(id) ||
+        supersededDecisions.has(cleanId)
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }, [lastSyncEvent, allCitedIds]);
+
+
   // 1. Loading Skeleton State
   if (isLoading) {
     return (
@@ -121,56 +173,6 @@ export function BriefingView({
     );
   }
 
-  const briefing = response?.briefing;
-  const { lastSyncEvent } = useGraphSync();
-  const handleReRun = onReRunBriefing ?? onRefreshBriefing;
-
-  const allCitedIds = useMemo(() => {
-    if (!briefing) return [];
-    const ids = new Set<string>();
-    if (response?.evidence?.verifiedNodeIds) {
-      for (const id of response.evidence.verifiedNodeIds) ids.add(id);
-    }
-    for (const t of briefing.summary?.keyTakeaways || []) {
-      for (const id of t.citedNodeIds || []) ids.add(id);
-    }
-    for (const c of briefing.blastRadius?.affectedComponents || []) {
-      for (const id of c.citedNodeIds || []) ids.add(id);
-    }
-    for (const o of briefing.keyOwners || []) {
-      for (const id of o.citedNodeIds || []) ids.add(id);
-    }
-    for (const d of briefing.constrainingDecisions || []) {
-      for (const id of d.citedNodeIds || []) ids.add(id);
-    }
-    for (const p of briefing.precedents || []) {
-      for (const id of p.citedNodeIds || []) ids.add(id);
-    }
-    return Array.from(ids);
-  }, [briefing, response?.evidence?.verifiedNodeIds]);
-
-  const isStale = useMemo(() => {
-    if (!lastSyncEvent || allCitedIds.length === 0) return false;
-    const updatedFiles = new Set(lastSyncEvent.updated.files);
-    const updatedDecisions = new Set(lastSyncEvent.updated.decisions);
-    const supersededDecisions = new Set(lastSyncEvent.superseded);
-
-    for (const id of allCitedIds) {
-      const cleanId = id.replace(/^(f:|file:|d:|dec:|cm:|commit:)/, '');
-      if (
-        updatedFiles.has(id) ||
-        updatedFiles.has(cleanId) ||
-        updatedDecisions.has(id) ||
-        updatedDecisions.has(cleanId) ||
-        supersededDecisions.has(id) ||
-        supersededDecisions.has(cleanId)
-      ) {
-        return true;
-      }
-    }
-    return false;
-  }, [lastSyncEvent, allCitedIds]);
-
   if (!briefing) return null;
 
   // Calculate section citation badge counts
@@ -212,10 +214,10 @@ export function BriefingView({
       {isStale && (
         <div
           data-testid="briefing-stale-alert"
-          className="mx-4 sm:mx-6 mt-4 p-3 border border-amber-500/70 bg-amber-950/40 text-amber-300 text-xs flex flex-wrap items-center justify-between gap-2 shadow-lg"
+          className="mx-4 sm:mx-6 mt-4 p-3 border border-warning/70 bg-warning/10 text-warning text-xs flex flex-wrap items-center justify-between gap-2"
         >
           <div className="flex items-center gap-2 font-mono">
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shadow-[0_0_8px_#fbbf24]" />
+            <span className="w-2 h-2 bg-warning animate-pulse" />
             <span>Repository updated since briefing was generated. Citations may be stale.</span>
           </div>
           {handleReRun && (
@@ -223,7 +225,7 @@ export function BriefingView({
               type="button"
               onClick={handleReRun}
               data-testid="briefing-rerun-btn"
-              className="px-2.5 py-1 text-[11px] font-bold border border-amber-500/80 bg-amber-900/60 hover:bg-amber-800 text-amber-200 transition-colors uppercase tracking-wider cursor-pointer"
+              className="px-2.5 py-1 text-[11px] font-bold border border-warning/80 bg-warning/10 hover:bg-warning hover:text-background text-warning transition-colors uppercase tracking-wider cursor-pointer"
             >
               [Re-Run Briefing]
             </button>

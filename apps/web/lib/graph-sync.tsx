@@ -116,6 +116,17 @@ export function GraphSyncProvider({ children, workspaceId, token }: GraphSyncPro
     }
   }, []);
 
+  // Selection / hover / focus / sync badges belong to one workspace's graph
+  useEffect(() => {
+    setHoveredNodeId(null);
+    setSelectedNodeId(null);
+    setHighlightedIdsState([]);
+    setFocusRequest(null);
+    setLastSyncEvent(null);
+    setIsSyncing(false);
+    setSyncBadgeText(null);
+  }, [workspaceId]);
+
   // Connect to SSE stream when workspaceId is available
   useEffect(() => {
     if (!workspaceId) return;
@@ -134,7 +145,7 @@ export function GraphSyncProvider({ children, workspaceId, token }: GraphSyncPro
         const badgeText = formatSyncBadgeText(event);
         setSyncBadgeText(badgeText);
 
-        // Notify subscribers (Cytoscape canvas, Briefing view, etc.)
+        // Notify subscribers (graph canvas, Briefing view, etc.)
         for (const cb of listenersRef.current) {
           try {
             cb(event);

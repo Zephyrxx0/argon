@@ -44,6 +44,13 @@ export async function POST(req: NextRequest) {
     );
 
     const graphClient = new ArgonGraphClient();
+    // The client must be connected before the tenant check and the pipeline can query it.
+    // If FalkorDB is down this stays unconnected and the pipeline refuses ("no graph, no answer").
+    try {
+      await graphClient.connect();
+    } catch {
+      // handled downstream: ping() is false and queries throw FalkorUnavailableError
+    }
 
     // Extract caller identity from Bearer token if present (TENANT-01)
     let callerToken: string | undefined;

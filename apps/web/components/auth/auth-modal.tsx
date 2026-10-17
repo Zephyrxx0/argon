@@ -61,10 +61,10 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
   return (
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-[#090a0f]/85 backdrop-blur-sm animate-in fade-in-0" />
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm animate-in fade-in-0" />
         <Dialog.Content
           data-testid="auth-modal"
-          className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] w-full max-w-md border border-border bg-card shadow-[0_0_60px_rgba(0,0,0,0.85)] font-mono outline-none animate-in fade-in-0 zoom-in-95 duration-150 p-0 overflow-hidden"
+          className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] w-full max-w-md border border-border bg-card font-mono outline-none animate-in fade-in-0 zoom-in-95 duration-150 p-0 overflow-hidden"
         >
           {/* Header Bar */}
           <div className="flex items-center justify-between p-4 border-b border-border bg-muted/40">
@@ -179,7 +179,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
                       data-testid="github-signin-button"
                       onClick={handleGitHubSignIn}
                       disabled={isSubmitting || authLoading}
-                      className="w-full py-2.5 px-4 text-xs font-bold uppercase tracking-wider text-accent border border-accent hover:bg-accent/10 transition-colors flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(0,240,255,0.15)]"
+                      className="w-full py-2.5 px-4 text-xs font-bold uppercase tracking-wider text-accent border border-accent hover:bg-accent/10 transition-colors flex items-center justify-center gap-2"
                     >
                       <GithubIcon className="w-4 h-4" />
                       <span>Sign in with GitHub</span>

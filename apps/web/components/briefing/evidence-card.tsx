@@ -54,13 +54,13 @@ export function EvidenceCard({
         };
       case 'FILE':
         return {
-          badge: 'border-blue-400/50 bg-blue-500/10 text-blue-400',
-          icon: <FileCode className="w-3 h-3 text-blue-400" />,
+          badge: 'border-foreground/40 bg-foreground/5 text-foreground',
+          icon: <FileCode className="w-3 h-3 text-foreground" />,
         };
       case 'PERSON':
         return {
-          badge: 'border-purple-400/50 bg-purple-500/10 text-purple-400',
-          icon: <User className="w-3 h-3 text-purple-400" />,
+          badge: 'border-foreground/40 bg-foreground/5 text-foreground',
+          icon: <User className="w-3 h-3 text-foreground" />,
         };
     }
   };
@@ -75,9 +75,9 @@ export function EvidenceCard({
       className={clsx(
         'border bg-card p-4 font-mono transition-all duration-150 relative space-y-3',
         isSelected
-          ? 'border-accent shadow-[0_0_15px_rgba(0,240,255,0.25)] bg-card ring-1 ring-accent'
+          ? 'border-accent bg-card ring-1 ring-accent'
           : isHovered
-          ? 'border-accent/80 shadow-[0_0_10px_rgba(0,240,255,0.15)] bg-card'
+          ? 'border-accent/80 bg-card'
           : 'border-border hover:border-border/80',
         validity === 'SUPERSEDED' && 'opacity-85 border-l-2 border-l-danger',
         className
@@ -130,7 +130,7 @@ export function EvidenceCard({
           ) : (
             <span
               data-testid="evidence-valid-badge"
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/40 bg-emerald-500/10"
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold text-success border border-success/40 bg-success/10"
             >
               <ShieldCheck className="w-2.5 h-2.5" />
               <span>VALID IN FORCE</span>

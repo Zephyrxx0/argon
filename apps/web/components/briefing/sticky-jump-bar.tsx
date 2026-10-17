@@ -58,7 +58,7 @@ export function StickyJumpBar({ counts = {}, className }: StickyJumpBarProps) {
             className={clsx(
               'flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider border transition-colors shrink-0',
               isActive
-                ? 'border-accent bg-accent/15 text-accent shadow-[0_0_8px_rgba(0,240,255,0.2)]'
+                ? 'border-accent bg-accent/15 text-accent'
                 : 'border-border/60 bg-muted/40 text-muted-foreground hover:border-border hover:text-foreground'
             )}
           >

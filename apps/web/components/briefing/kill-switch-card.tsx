@@ -37,7 +37,7 @@ export function KillSwitchCard({
     <div
       data-testid="kill-switch-card"
       className={clsx(
-        'm-4 sm:m-6 border-2 border-danger bg-danger/5 font-mono p-5 sm:p-6 relative shadow-[0_0_30px_rgba(255,0,85,0.25)] space-y-4 animate-in fade-in zoom-in-95 duration-200',
+        'm-4 sm:m-6 border-2 border-danger bg-danger/5 font-mono p-5 sm:p-6 relative space-y-4 animate-in fade-in zoom-in-95 duration-200',
         className
       )}
     >
