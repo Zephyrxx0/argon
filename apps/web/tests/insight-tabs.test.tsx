@@ -116,6 +116,16 @@ describe('InsightPane tabs', () => {
   const renderPane = () =>
     render(<InsightPane workspaceId="synthetic-demo" graph={<div data-testid="graph-stub" />} />);
 
+  it('right-aligns the MCP and Guide (help) tabs away from the data views', () => {
+    renderPane();
+    // ml-auto on the first help tab pushes it and Guide to the right edge
+    expect(screen.getByTestId('insight-tab-mcp').className).toContain('ml-auto');
+    expect(screen.getByTestId('insight-tab-guide').className).not.toContain('ml-auto');
+    for (const id of ['graph', 'files', 'diff']) {
+      expect(screen.getByTestId(`insight-tab-${id}`).className).not.toContain('ml-auto');
+    }
+  });
+
   it('shows five tabs: Graph, Files, Diff, MCP, Guide', () => {
     renderPane();
     for (const id of ['graph', 'files', 'diff', 'mcp', 'guide']) {

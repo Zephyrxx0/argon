@@ -19,12 +19,13 @@ const DecisionDiffPanel = dynamic(
 
 export type InsightTab = 'graph' | 'files' | 'diff' | 'mcp' | 'guide';
 
-const TABS: Array<{ id: InsightTab; label: string; Icon: typeof Network }> = [
+const TABS: Array<{ id: InsightTab; label: string; Icon: typeof Network; align?: 'end' }> = [
   { id: 'graph', label: 'Graph', Icon: Network },
   { id: 'files', label: 'Files', Icon: FolderTree },
   { id: 'diff', label: 'Diff', Icon: GitCompare },
-  { id: 'mcp', label: 'MCP', Icon: Plug },
-  { id: 'guide', label: 'Guide', Icon: BookOpen },
+  // Help / meta tabs, pushed to the right edge away from the data views.
+  { id: 'mcp', label: 'MCP', Icon: Plug, align: 'end' },
+  { id: 'guide', label: 'Guide', Icon: BookOpen, align: 'end' },
 ];
 
 export interface InsightPaneProps {
@@ -62,27 +63,32 @@ export function InsightPane({
         aria-label="Workspace views"
         className="flex shrink-0 border-b border-border"
       >
-        {TABS.map(({ id, label, Icon }) => (
-          <button
-            key={id}
-            id={tabId(id)}
-            role="tab"
-            type="button"
-            aria-selected={tab === id}
-            aria-controls={panelId(id)}
-            data-testid={`insight-tab-${id}`}
-            onClick={() => select(id)}
-            className={clsx(
-              'flex items-center gap-2 border-r border-border px-4 py-2 text-[11px] font-bold uppercase tracking-[0.2em] transition-colors',
-              tab === id
-                ? 'bg-foreground text-background'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-            )}
-          >
-            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-            {label}
-          </button>
-        ))}
+        {TABS.map(({ id, label, Icon, align }, index) => {
+          // The first right-aligned tab gets ml-auto, pushing it and the rest to the right edge.
+          const isFirstEnd = align === 'end' && TABS[index - 1]?.align !== 'end';
+          return (
+            <button
+              key={id}
+              id={tabId(id)}
+              role="tab"
+              type="button"
+              aria-selected={tab === id}
+              aria-controls={panelId(id)}
+              data-testid={`insight-tab-${id}`}
+              onClick={() => select(id)}
+              className={clsx(
+                'flex items-center gap-2 border-border px-4 py-2 text-[11px] font-bold uppercase tracking-[0.2em] transition-colors',
+                isFirstEnd ? 'ml-auto border-l border-r' : 'border-r',
+                tab === id
+                  ? 'bg-foreground text-background'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+              {label}
+            </button>
+          );
+        })}
       </div>
 
       <div className="relative min-h-0 flex-1">
