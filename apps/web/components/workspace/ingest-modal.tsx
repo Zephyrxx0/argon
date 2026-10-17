@@ -19,7 +19,7 @@ import { RepoPicker, type GitHubRepositoryItem } from './repo-picker';
 import { useAuth } from '@/app/providers';
 import { AuthModal } from '@/components/auth/auth-modal';
 import {
-  startPrivateIngest,
+  startOwnedIngest,
   startPublicIngest,
   stepIndexForStatus,
   waitForIngest,
@@ -138,7 +138,7 @@ export function IngestModal({
   const runPipeline = async (
     repoFullName: string,
     targetUrl: string,
-    installationId?: number
+    source: 'owned' | 'url'
   ) => {
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -150,9 +150,10 @@ export function IngestModal({
 
     try {
       const token = await getToken();
-      const started = installationId
-        ? await startPrivateIngest(repoFullName, installationId, token, controller.signal)
-        : await startPublicIngest(targetUrl, token, controller.signal);
+      const started =
+        source === 'owned'
+          ? await startOwnedIngest(repoFullName, token, controller.signal)
+          : await startPublicIngest(targetUrl, token, controller.signal);
 
       const final = await waitForIngest(started.workspaceId, {
         getToken,
@@ -177,8 +178,8 @@ export function IngestModal({
   };
 
   // Trigger from RepoPicker selection
-  const handleSelectPrivateRepo = (repo: GitHubRepositoryItem) => {
-    runPipeline(repo.fullName, repo.htmlUrl, repo.installationId);
+  const handleSelectOwnedRepo = (repo: GitHubRepositoryItem) => {
+    runPipeline(repo.fullName, repo.htmlUrl, 'owned');
   };
 
   // Trigger from Public URL tab submission
@@ -195,7 +196,7 @@ export function IngestModal({
       const pathParts = parsed.pathname.split('/').filter(Boolean);
       const owner = pathParts[0];
       const name = pathParts[1].replace(/\.git$/, '');
-      runPipeline(`${owner}/${name}`, repoUrl.trim());
+      runPipeline(`${owner}/${name}`, repoUrl.trim(), 'url');
     } catch {
       setValidationError('Malformed URL format');
     }
@@ -288,7 +289,7 @@ export function IngestModal({
                 {/* Tab 1: Your Repositories */}
                 <Tabs.Content value="picker" className="pt-2 focus:outline-none">
                   <RepoPicker
-                    onSelectRepo={handleSelectPrivateRepo}
+                    onSelectRepo={handleSelectOwnedRepo}
                     isGuest={isAnonymous}
                     onOpenAuth={handleOpenAuth}
                     initialRepositories={initialRepositories}

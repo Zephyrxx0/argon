@@ -34,8 +34,9 @@ function mockGateway(opts: {
     { status: 'completed', progress: 1, nodeCount: 287, error: null },
   ];
   let i = 0;
-  const fetchMock = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+  const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
     if (init?.method === 'POST') {
+      (globalThis as any).__lastIngestPost = { url, body: init?.body ? JSON.parse(String(init.body)) : null };
       if (opts.startStatus && opts.startStatus >= 400) {
         return Promise.resolve({ ok: false, status: opts.startStatus, json: () => Promise.resolve({ error: opts.startError }) });
       }
@@ -67,7 +68,6 @@ describe('IngestModal & RepoPicker Integration (Task 07-03-01, ING-04)', () => {
       owner: { login: 'argon-org', avatarUrl: 'https://github.com/argon.png' },
       description: 'Core private backend repository',
       htmlUrl: 'https://github.com/argon-org/argon-private-core',
-      installationId: 1001,
     },
     {
       id: 102,
@@ -78,7 +78,6 @@ describe('IngestModal & RepoPicker Integration (Task 07-03-01, ING-04)', () => {
       owner: { login: 'acme-inc', avatarUrl: 'https://github.com/acme.png' },
       description: 'Web frontend client',
       htmlUrl: 'https://github.com/acme-inc/acme-web-client',
-      installationId: 1002,
     },
   ];
 
@@ -134,7 +133,7 @@ describe('IngestModal & RepoPicker Integration (Task 07-03-01, ING-04)', () => {
     );
 
     expect(screen.getByTestId('repo-picker-guest')).toBeInTheDocument();
-    expect(screen.getByText('Sign In to Access Private Repositories')).toBeInTheDocument();
+    expect(screen.getByText('Sign In to Access Your Repositories')).toBeInTheDocument();
 
     const authBtn = screen.getByTestId('repo-picker-guest-auth-btn');
     fireEvent.click(authBtn);
@@ -238,6 +237,11 @@ describe('IngestModal & RepoPicker Integration (Task 07-03-01, ING-04)', () => {
       },
       { timeout: 4000 }
     );
+
+    const post = (globalThis as any).__lastIngestPost;
+    expect(post.url).toBe('/api/v1/workspaces/ingest');
+    expect(post.body).toEqual({ repositoryFullName: 'argon-org/argon-private-core' });
+    expect(post.body).not.toHaveProperty('installationId');
   });
 
   it('switches to "Public Git URL" tab and validates public URL input', async () => {

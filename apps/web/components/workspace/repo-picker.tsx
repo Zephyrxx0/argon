@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useTransition } from 'react';
-import { Search, Lock, Globe, RefreshCw, AlertTriangle, ExternalLink, GitBranch, ArrowRight } from 'lucide-react';
+import { Search, Lock, Globe, RefreshCw, AlertTriangle, GitBranch, ArrowRight } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuth } from '@/app/providers';
 
@@ -17,7 +17,6 @@ export interface GitHubRepositoryItem {
   };
   description: string | null;
   htmlUrl: string;
-  installationId: number;
 }
 
 export interface RepoPickerProps {
@@ -126,10 +125,10 @@ export function RepoPicker({
         </div>
         <div className="space-y-1">
           <h4 className="text-sm font-bold text-foreground uppercase tracking-wider">
-            Sign In to Access Private Repositories
+            Sign In to Access Your Repositories
           </h4>
           <p className="text-xs text-muted-foreground max-w-sm mx-auto leading-relaxed">
-            You are browsing as an anonymous guest. Sign in with GitHub to view and index repositories from your authorized GitHub App installations.
+            You are browsing as an anonymous guest. Sign in with GitHub to view and index your repositories (public and private).
           </p>
         </div>
         <button
@@ -201,19 +200,10 @@ export function RepoPicker({
             No Repositories Found
           </h4>
           <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
-            The Argon GitHub App is not installed on any repositories, or no repositories match your search filter.
+            No repositories match your search, or your GitHub account has no repositories Argon can access.
           </p>
         </div>
         <div className="flex items-center justify-center gap-3 pt-2">
-          <a
-            href="https://github.com/apps/argon-knowledge/installations/new"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-background bg-accent hover:bg-accent/90 transition-colors uppercase tracking-wider"
-          >
-            <span>Install GitHub App</span>
-            <ExternalLink className="w-3.5 h-3.5" />
-          </a>
           <button
             type="button"
             onClick={fetchRepositories}

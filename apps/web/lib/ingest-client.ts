@@ -61,16 +61,19 @@ export async function startPublicIngest(
   return (await res.json()) as StartedIngest;
 }
 
-export async function startPrivateIngest(
+/**
+ * Ingest one of the signed-in user's own repositories (public or private). The gateway clones it
+ * with the user's GitHub OAuth token — no installation id / GitHub App required.
+ */
+export async function startOwnedIngest(
   repositoryFullName: string,
-  installationId: number,
   token: string | null,
   signal?: AbortSignal
 ): Promise<StartedIngest> {
   const res = await fetch('/api/v1/workspaces/ingest', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
-    body: JSON.stringify({ repositoryFullName, installationId }),
+    body: JSON.stringify({ repositoryFullName }),
     signal,
   });
   if (!res.ok) throw new Error(await readError(res, 'Could not start ingestion'));
