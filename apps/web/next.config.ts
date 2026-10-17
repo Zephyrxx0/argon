@@ -1,6 +1,16 @@
+import path from 'node:path';
+import dotenv from 'dotenv';
 import type { NextConfig } from 'next';
 
+// Next only reads env files from apps/web; this monorepo keeps its shared config
+// (GEMINI_API_KEY, FALKORDB_URL, GATEWAY_*) in the repository root .env.
+// dotenv never overrides variables that are already set, so real env vars still win.
+dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
+
 const nextConfig: NextConfig = {
+  // Allow an isolated build dir (e.g. a second dev server) so concurrent servers never share
+  // and corrupt the same .next cache. Unset in normal use.
+  ...(process.env.ARGON_DIST_DIR ? { distDir: process.env.ARGON_DIST_DIR } : {}),
   transpilePackages: ['@argon/graph', '@argon/agent'],
   serverExternalPackages: [
     '@huggingface/transformers',

@@ -8,5 +8,6 @@ allowBuilds:
   onnxruntime-node: true
   protobufjs: true
   sharp: true
+  unrs-resolver: false
 minimumReleaseAgeExclude:
   - '@google/genai@2.30.0'
