@@ -147,3 +147,34 @@ describe('Provider Configuration & Fallback Mechanics', () => {
     );
   });
 });
+
+describe('Shared model cache resolution', () => {
+  it('prefers TRANSFORMERS_CACHE, then the monorepo root, then the cwd', async () => {
+    const { resolveModelCacheDir } = await import('../src/embedding/embedder.js');
+    const path = await import('node:path');
+    const fs = await import('node:fs');
+    const os = await import('node:os');
+
+    expect(resolveModelCacheDir('/anywhere', { TRANSFORMERS_CACHE: '/custom/cache' } as any)).toBe('/custom/cache');
+
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'argon-cache-'));
+    try {
+      fs.writeFileSync(path.join(root, 'pnpm-workspace.yaml'), 'packages: []\n');
+      const nested = path.join(root, 'apps', 'gateway');
+      fs.mkdirSync(nested, { recursive: true });
+      // any process started inside the monorepo shares ONE cache at the root
+      expect(resolveModelCacheDir(nested, {} as any)).toBe(path.join(root, '.cache', 'models'));
+      expect(resolveModelCacheDir(root, {} as any)).toBe(path.join(root, '.cache', 'models'));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+
+    const lone = fs.mkdtempSync(path.join(os.tmpdir(), 'argon-lone-'));
+    try {
+      // no workspace file above (tmpdir is outside any monorepo): falls back to cwd
+      expect(resolveModelCacheDir(lone, {} as any)).toBe(path.join(lone, '.cache', 'models'));
+    } finally {
+      fs.rmSync(lone, { recursive: true, force: true });
+    }
+  });
+});

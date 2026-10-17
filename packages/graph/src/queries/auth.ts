@@ -35,11 +35,16 @@ export async function checkWorkspaceAccess(
            (w.is_public = true OR r IS NOT NULL) AS allowed;
   `;
 
-  const res = await client.roQuery<WorkspaceAccessResult>(
-    workspaceId,
-    cypher,
-    { workspaceId, userId }
-  );
+  let res;
+  try {
+    res = await client.roQuery<WorkspaceAccessResult>(workspaceId, cypher, { workspaceId, userId });
+  } catch (err: any) {
+    // FalkorDB raises this when the per-workspace graph key does not exist at all
+    if (String(err?.message ?? '').includes('empty key')) {
+      return { exists: false, allowed: false };
+    }
+    throw err;
+  }
 
   const row = res.data?.[0];
   if (!row) {

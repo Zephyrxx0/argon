@@ -48,9 +48,10 @@ OPTIONAL MATCH (f:File) WHERE f.path IN $paths
 OPTIONAL MATCH (f)-[:IN_COMPONENT]->(c:Component)
 WITH collect(DISTINCT f) AS matchedFiles, collect(DISTINCT c) AS matchedComponents
 OPTIONAL MATCH (c2:Component) WHERE c2.name IN $names
-WITH [f IN matchedFiles WHERE f IS NOT NULL] AS cleanFiles,
-     [c IN matchedComponents + collect(DISTINCT c2) WHERE c IS NOT NULL] AS allComponents
-RETURN cleanFiles AS matchedFiles, allComponents;`,
+WITH matchedFiles, matchedComponents, collect(DISTINCT c2) AS namedComponents
+RETURN [f IN matchedFiles WHERE f IS NOT NULL] AS matchedFiles,
+       [c IN matchedComponents + namedComponents WHERE c IS NOT NULL] AS allComponents;
+`,
 
   '02_blast_radius.cypher': `// Traverses touched files through components and dependency chains up to 3 hops
 MATCH (f:File) WHERE f.path IN $files
@@ -87,13 +88,16 @@ MATCH (f)-[:IN_COMPONENT]->(c:Component)<-[:GOVERNS]-(d:Decision)
 WHERE d.valid_from <= $asOf AND (d.valid_to IS NULL OR d.valid_to > $asOf)
 RETURN d.id AS id, d.title AS title, d.status AS status, c.name AS component, d.source_url AS sourceUrl;`,
 
-  '06_precedent_search.cypher': `// Performs 512-d cosine vector search over decisions and expands to governed components & PRs
+  '06_precedent_search.cypher': `// Performs 512-d cosine vector search over decisions and expands to governed components & PRs.
+// FalkorDB's vector index yields cosine DISTANCE (0 = identical); convert to similarity so that
+// higher is better (and ORDER BY ... DESC puts the closest decision first).
 CALL db.idx.vector.queryNodes('Decision', 'embedding', $limit, vecf32($queryVector))
 YIELD node, score
 OPTIONAL MATCH (node)-[:GOVERNS]->(c:Component)
 OPTIONAL MATCH (node)-[:EXTRACTED_FROM]->(pr:PullRequest)
-RETURN node AS decision, score, c AS component, pr AS pullRequest
-ORDER BY score DESC;`,
+RETURN node AS decision, (1.0 - score) AS score, c AS component, pr AS pullRequest
+ORDER BY score DESC;
+`,
 
   '07_path_between.cypher': `// Finds the shortest dependency path between two components via FalkorDB algo.SPpaths
 MATCH (src:Component {name: $sourceName}), (tgt:Component {name: $targetName})

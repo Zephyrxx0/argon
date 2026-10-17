@@ -1,11 +1,35 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { pipeline, env } from '@huggingface/transformers';
 import { GoogleGenAI } from '@google/genai';
 import type { EmbedderConfig, EmbeddingProvider, EmbedResult } from './types';
 
-// Default model cache path conforming to D-14 (.cache/models)
-const defaultCache = path.resolve(process.cwd(), '.cache/models');
-env.cacheDir = process.env.TRANSFORMERS_CACHE ?? defaultCache;
+/**
+ * Where the ONNX model lives (D-14: .cache/models). A cwd-relative cache meant every process
+ * (web, gateway, ingest CLI, tests...) downloaded its own ~850 MB copy on first use, and a
+ * half-finished download made embedding fail. Resolve ONE shared cache instead:
+ *   1. TRANSFORMERS_CACHE, if set
+ *   2. <monorepo root>/.cache/models (found via pnpm-workspace.yaml, walking up from cwd)
+ *   3. <cwd>/.cache/models
+ */
+export function resolveModelCacheDir(
+  cwd: string = process.cwd(),
+  envVars: NodeJS.ProcessEnv = process.env
+): string {
+  if (envVars.TRANSFORMERS_CACHE) return envVars.TRANSFORMERS_CACHE;
+  let dir = path.resolve(cwd);
+  while (true) {
+    if (fs.existsSync(path.join(dir, 'pnpm-workspace.yaml'))) {
+      return path.join(dir, '.cache', 'models');
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return path.resolve(cwd, '.cache/models');
+}
+
+env.cacheDir = resolveModelCacheDir();
 
 /**
  * Format input string with required task-specific prefixes for EmbeddingGemma-2.
@@ -70,9 +94,10 @@ export class ArgonEmbedder {
   private readonly geminiApiKey?: string;
 
   constructor(config?: EmbedderConfig) {
+    // Explicit constructor config wins over the environment default.
     this.provider =
-      (process.env.EMBEDDING_PROVIDER as EmbeddingProvider) ??
       config?.provider ??
+      (process.env.EMBEDDING_PROVIDER as EmbeddingProvider | undefined) ??
       'auto';
     this.modelName =
       config?.modelName ??
@@ -97,6 +122,10 @@ export class ArgonEmbedder {
         this.modelName,
         { dtype: 'q8', device: 'cpu' }
       );
+      // Don't cache a failure (e.g. interrupted download): let the next call retry.
+      this.localPipelinePromise.catch(() => {
+        this.localPipelinePromise = null;
+      });
     }
     return this.localPipelinePromise;
   }
