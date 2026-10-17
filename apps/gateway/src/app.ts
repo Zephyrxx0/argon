@@ -28,6 +28,8 @@ export interface GatewayAppOptions {
   eventsOptions?: EventsRouteOptions;
 }
 
+const PUBLIC_INGEST_MAX_COMMITS = 500;
+
 export function createGatewayApp(options?: GatewayAppOptions): Hono {
   const app = new Hono();
 
@@ -66,8 +68,27 @@ export function createGatewayApp(options?: GatewayAppOptions): Hono {
     });
   };
 
+  // Public-repo ingestion is bounded: recent history only, so a huge repository cannot
+  // pin a worker for minutes. Runs in the background; progress is read via /ingest-status.
+  const defaultOnIngestPublic: NonNullable<GitHubRouteOptions['onIngestPublic']> = (payload) => {
+    runIngestion({
+      repoUrl: payload.repoUrl,
+      workspaceId: payload.workspaceId,
+      jobId: payload.jobId,
+      client: options?.graphClient,
+      userId: payload.userId,
+      depth: PUBLIC_INGEST_MAX_COMMITS,
+      maxCommits: PUBLIC_INGEST_MAX_COMMITS,
+    })
+      .catch((err) => {
+        console.error(`[gateway:ingest] Public ingestion failed for ${payload.repositoryFullName}:`, err?.message ?? err);
+      })
+      .finally(payload.release);
+  };
+
   const githubRouteOptions: GitHubRouteOptions = {
     onIngest: options?.githubRouteOptions?.onIngest ?? defaultOnIngest,
+    onIngestPublic: options?.githubRouteOptions?.onIngestPublic ?? defaultOnIngestPublic,
     ...options?.githubRouteOptions,
   };
   const ghRoute = githubRoute(githubApp, options?.graphClient, githubRouteOptions);

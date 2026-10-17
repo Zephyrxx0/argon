@@ -8,6 +8,7 @@ export const ErrorCodes = {
   FALKORDB_TIMEOUT: 'FALKORDB_TIMEOUT',
   FALKORDB_UNREACHABLE: 'FALKORDB_UNREACHABLE',
   INTERNAL_ERROR: 'INTERNAL_ERROR',
+  RATE_LIMITED: 'RATE_LIMITED',
 } as const;
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];
