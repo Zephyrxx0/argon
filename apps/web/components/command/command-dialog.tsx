@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Command } from 'cmdk';
-import { Search, Sparkles, FileCode, Clock, Box, X } from 'lucide-react';
+import { Search, Sparkles, FileCode, Clock, Box, X, Zap, GitBranch } from 'lucide-react';
 import type { PaletteEntity, ScenarioPreset } from '@/lib/scenarios';
+import type { PaletteSearchFn, PaletteSearchHit } from '@/lib/palette-search-client';
 
 export interface CommandDialogProps {
   open: boolean;
@@ -14,9 +15,18 @@ export interface CommandDialogProps {
   scenarios?: ScenarioPreset[];
   entities?: PaletteEntity[];
   curated?: boolean;
+  /** Semantic graph search (decisions by vector, files/components by name). Optional. */
+  onSemanticSearch?: PaletteSearchFn;
 }
 
 const RECENT_QUERIES_KEY = 'argon_recent_queries_v1';
+const SEMANTIC_DEBOUNCE_MS = 250;
+
+const HIT_ICON = {
+  decision: GitBranch,
+  file: FileCode,
+  component: Box,
+} as const;
 
 export function CommandDialog({
   open,
@@ -25,9 +35,12 @@ export function CommandDialog({
   scenarios = [],
   entities = [],
   curated = false,
+  onSemanticSearch,
 }: CommandDialogProps) {
   const [search, setSearch] = useState('');
   const [recentQueries, setRecentQueries] = useState<string[]>([]);
+  const [semanticHits, setSemanticHits] = useState<PaletteSearchHit[]>([]);
+  const [semanticLoading, setSemanticLoading] = useState(false);
 
   // Tell the rest of the page the palette is open, so the graph canvas (and its floating HUD /
   // inspector) can go inert and blurred behind the overlay.
@@ -47,6 +60,43 @@ export function CommandDialog({
       }
     } catch {
       // localStorage may be disabled
+    }
+  }, [open]);
+
+  // Debounced semantic graph search. Each keystroke (after the debounce) aborts the previous
+  // request; results are kept separate from the local cmdk filter and shown in their own group.
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => {
+    if (!onSemanticSearch) return;
+    const q = search.trim();
+    if (!open || q.length < 2) {
+      setSemanticHits([]);
+      setSemanticLoading(false);
+      return;
+    }
+    setSemanticLoading(true);
+    const controller = new AbortController();
+    abortRef.current?.abort();
+    abortRef.current = controller;
+    const timer = setTimeout(async () => {
+      const hits = await onSemanticSearch(q, controller.signal);
+      if (!controller.signal.aborted) {
+        setSemanticHits(hits);
+        setSemanticLoading(false);
+      }
+    }, SEMANTIC_DEBOUNCE_MS);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [search, open, onSemanticSearch]);
+
+  // Clear transient search state whenever the palette closes.
+  useEffect(() => {
+    if (!open) {
+      setSearch('');
+      setSemanticHits([]);
+      setSemanticLoading(false);
     }
   }, [open]);
 
@@ -133,6 +183,38 @@ export function CommandDialog({
             <Command.Empty className="py-8 text-center text-xs text-muted-foreground">
               No matching files, components, or scenarios found.
             </Command.Empty>
+
+            {/* Semantic graph matches (decisions by vector, files/components by name) */}
+            {onSemanticSearch && search.trim().length >= 2 && (semanticLoading || semanticHits.length > 0) && (
+              <Command.Group
+                heading={semanticLoading ? 'SEARCHING THE GRAPH…' : 'SEMANTIC MATCHES'}
+                className="text-[11px] font-semibold text-muted-foreground uppercase px-2 pt-2"
+              >
+                {semanticHits.map((hit) => {
+                  const Icon = HIT_ICON[hit.type];
+                  return (
+                    <Command.Item
+                      // include the raw search so cmdk's substring filter never hides a graph hit
+                      key={`semantic-${hit.type}-${hit.id}`}
+                      value={`semantic ${search} ${hit.label} ${hit.id}`}
+                      onSelect={() => handleSelect(hit.query)}
+                      data-testid={`command-semantic-${hit.type}`}
+                      className="flex items-center justify-between p-2 my-1 text-xs cursor-pointer text-foreground hover:bg-accent/10 hover:text-accent border border-transparent hover:border-accent/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Zap className="w-3 h-3 text-accent shrink-0" />
+                        <Icon className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                        <span className="font-medium truncate">{hit.label}</span>
+                        <span className="text-[11px] text-muted-foreground hidden sm:inline truncate">— {hit.desc}</span>
+                      </div>
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0 ml-2">
+                        {hit.type}
+                      </span>
+                    </Command.Item>
+                  );
+                })}
+              </Command.Group>
+            )}
 
             {/* Scenarios for this workspace */}
             {scenarios.length > 0 && (

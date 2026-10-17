@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Loader2, AlertCircle, CornerDownLeft } from 'lucide-react';
 import { CommandDialog } from './command-dialog';
 import type { WorkspaceSuggestions } from '@/lib/scenarios';
+import type { PaletteSearchFn } from '@/lib/palette-search-client';
 import { clsx } from 'clsx';
 
 export interface CommandBarProps {
@@ -13,6 +14,8 @@ export interface CommandBarProps {
   onSubmit: (query: string) => void;
   /** Palette suggestions for the active workspace. */
   suggestions?: WorkspaceSuggestions;
+  /** Semantic graph search for the Cmd+K palette (optional). */
+  onSemanticSearch?: PaletteSearchFn;
   className?: string;
 }
 
@@ -33,6 +36,7 @@ export function CommandBar({
   error = null,
   onSubmit,
   suggestions,
+  onSemanticSearch,
   className,
 }: CommandBarProps) {
   const [query, setQuery] = useState(value);
@@ -164,6 +168,7 @@ export function CommandBar({
         scenarios={suggestions?.scenarios}
         entities={suggestions?.entities}
         curated={suggestions?.curated}
+        onSemanticSearch={onSemanticSearch}
       />
     </>
   );

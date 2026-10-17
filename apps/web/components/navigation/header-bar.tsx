@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Terminal } from 'lucide-react';
 import { CommandBar } from '@/components/command/command-bar';
 import { WorkspaceSwitcher, type Workspace } from '@/components/workspace/workspace-switcher';
+import type { PaletteSearchFn } from '@/lib/palette-search-client';
 import { ContributorPicker } from '@/components/contributor/contributor-picker';
 import { UserButton } from '@/components/auth/user-button';
 import { AuthModal } from '@/components/auth/auth-modal';
@@ -18,6 +19,7 @@ export interface HeaderBarProps {
   error?: string | null;
   onSubmitQuery: (query: string) => void;
   suggestions?: WorkspaceSuggestions;
+  onSemanticSearch?: PaletteSearchFn;
   currentWorkspaceId?: string;
   onSelectWorkspace: (id: string) => void;
   onIngestSuccess?: (workspace: Workspace) => void;
@@ -36,6 +38,7 @@ export function HeaderBar({
   error = null,
   onSubmitQuery,
   suggestions,
+  onSemanticSearch,
   currentWorkspaceId = 'ember-adr-showcase',
   onSelectWorkspace,
   onIngestSuccess,
@@ -80,6 +83,7 @@ export function HeaderBar({
           error={error}
           onSubmit={onSubmitQuery}
           suggestions={suggestions}
+          onSemanticSearch={onSemanticSearch}
         />
       </div>
 

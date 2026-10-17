@@ -7,6 +7,7 @@ import { ShowcaseHub } from '@/components/hub/showcase-hub';
 import { BriefingView, type WebBriefingResponse } from '@/components/briefing/briefing-view';
 import { HeaderBar } from '@/components/navigation/header-bar';
 import { GraphSyncProvider } from '@/lib/graph-sync';
+import { createPaletteSearch } from '@/lib/palette-search-client';
 import { useAuth } from '@/app/providers';
 import {
   getStoredPreferences,
@@ -324,6 +325,12 @@ export default function WorkspacePage() {
   const [resyncVersion, setResyncVersion] = useState(0);
   const resourceIdentity = `${user?.id ?? ''}#${resyncVersion}`;
 
+  // Semantic palette search bound to the active workspace (page owns workspace id + token).
+  const paletteSearch = useMemo(
+    () => createPaletteSearch(currentWorkspaceId, getToken),
+    [currentWorkspaceId, getToken]
+  );
+
   // Without a (graphable) briefing the canvas shows this workspace's own architecture overview
   const overview = useWorkspaceResource<OverviewResponse>(
     currentWorkspaceId,
@@ -389,6 +396,7 @@ export default function WorkspacePage() {
         {/* Unified Top Navigation Header */}
         <HeaderBar
           suggestions={suggestions}
+          onSemanticSearch={paletteSearch}
           currentQuery={selectedTask}
           isLoading={isLoading}
           error={error}
