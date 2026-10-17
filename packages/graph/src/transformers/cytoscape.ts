@@ -205,7 +205,7 @@ export function toCytoscapeElements<T = unknown[]>(rawRecords: T): DualPayload<T
     }
 
     // 3. Who knows row: { component, authorId, authorName, authoredCount, reviewerId, ... }
-    else if (typeof record.component === 'string' && ('authoredCount' in record || 'reviewedCount' in record)) {
+    else if (typeof record.component === 'string' && ('authoredCount' in record || 'reviewedCount' in record || 'ownerId' in record)) {
       const compId = record.component;
       if (isTopLevel) primaryIdsList.push(compId);
       addNode({
@@ -229,6 +229,23 @@ export function toCytoscapeElements<T = unknown[]>(rawRecords: T): DualPayload<T
           target: compId,
           label: 'AUTHORED_FOR',
           properties: { count: record.authoredCount },
+        });
+      }
+
+      if (typeof record.ownerId === 'string' && record.ownerId.length > 0) {
+        const ownerId = record.ownerId;
+        addNode({
+          id: ownerId,
+          label: (record.ownerName as string) ?? ownerId,
+          type: ownerId.startsWith('@') && ownerId.includes('/') ? 'Team' : 'Person',
+          properties: { id: ownerId, display_name: record.ownerName },
+        });
+        addEdge({
+          id: `${ownerId}->OWNS->${compId}`,
+          source: ownerId,
+          target: compId,
+          label: 'OWNS',
+          properties: { pattern: record.ownerPattern },
         });
       }
 

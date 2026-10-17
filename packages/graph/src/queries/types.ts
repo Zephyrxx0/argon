@@ -107,6 +107,10 @@ export const WhoKnowsResultSchema = z.array(
     reviewerId: z.string().nullable().optional(),
     reviewerName: z.string().nullable().optional(),
     reviewedCount: z.coerce.number(),
+    /** CODEOWNERS owner of record for the component (Person or Team), when one is recorded. */
+    ownerId: z.string().nullable().optional(),
+    ownerName: z.string().nullable().optional(),
+    ownerPattern: z.string().nullable().optional(),
   })
 );
 export type WhoKnowsResult = z.infer<typeof WhoKnowsResultSchema>;
@@ -128,6 +132,14 @@ export const ConstrainingDecisionsResultSchema = z.array(
     status: z.string(),
     component: z.string(),
     sourceUrl: z.string().nullable().optional(),
+    // provenance (null when the decision was not extracted from a pull request)
+    prId: z.string().nullable().optional(),
+    prNumber: z.coerce.number().nullable().optional(),
+    prUrl: z.string().nullable().optional(),
+    issueId: z.string().nullable().optional(),
+    issueNumber: z.coerce.number().nullable().optional(),
+    issueUrl: z.string().nullable().optional(),
+    issueState: z.string().nullable().optional(),
   })
 );
 export type ConstrainingDecisionsResult = z.infer<typeof ConstrainingDecisionsResultSchema>;
@@ -148,6 +160,8 @@ export const PrecedentSearchResultSchema = z.array(
     score: z.coerce.number(),
     component: z.unknown().nullable().optional(),
     pullRequest: z.unknown().nullable().optional(),
+    /** Issue closed by the pull request the decision was extracted from, when known. */
+    issue: z.unknown().nullable().optional(),
   })
 );
 export type PrecedentSearchResult = z.infer<typeof PrecedentSearchResultSchema>;
@@ -188,3 +202,22 @@ export const ComponentOverviewResultSchema = z.array(
   })
 );
 export type ComponentOverviewResult = z.infer<typeof ComponentOverviewResultSchema>;
+
+// ==========================================
+// 9. Revert History
+// ==========================================
+
+export const RevertHistoryParamsSchema = z.object({
+  files: z.array(z.string()).min(1),
+  limit: z.number().int().min(1).max(100).default(20),
+});
+export type RevertHistoryParams = z.infer<typeof RevertHistoryParamsSchema>;
+
+export const RevertHistoryResultSchema = z.array(
+  z.object({
+    node: z.unknown(),
+    reverted: z.unknown().nullable().optional(),
+    files: z.array(z.string()),
+  })
+);
+export type RevertHistoryResult = z.infer<typeof RevertHistoryResultSchema>;

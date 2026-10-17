@@ -6,8 +6,15 @@
 // ==========================================
 //
 // (:Person {
-//   id: STRING,            // Hashed identity key (from commit email); raw emails never stored
-//   display_name: STRING   // Public display name / git author name
+//   id: STRING,            // Hashed identity key (from commit email), or "gh_<login>" for a GitHub
+//                          // account that could not be matched to a commit author; raw emails never stored
+//   display_name: STRING,  // Public display name / git author name
+//   github_login: STRING   // GitHub login, when known (reviews / CODEOWNERS / PR authors)
+// })
+//
+// (:Team {
+//   id: STRING,            // CODEOWNERS team handle, e.g. "@acme/platform"
+//   name: STRING
 // })
 //
 // (:Component {
@@ -19,16 +26,24 @@
 // })
 //
 // (:PullRequest {
-//   number: INTEGER,       // PR / MR number
-//   title: STRING,         // PR title
-//   merged_at: INTEGER     // Epoch timestamp in milliseconds of merge
+//   id: STRING,            // "pr_<sha12>" (one per git commit), or "pr_gh_<number>" for a GitHub PR
+//                          // whose merge commit is outside the mined history
+//   number: INTEGER,       // GitHub PR number (set once the commit is matched to a GitHub PR)
+//   title: STRING,         // PR title / commit subject
+//   url: STRING,           // https://github.com/<owner>/<repo>/pull/<n> (or the commit URL)
+//   state: STRING,         // "merged" | "closed" | "open"
+//   body_excerpt: STRING,  // first ~300 chars of the PR description
+//   is_revert: BOOLEAN,
+//   merged_at: INTEGER     // Epoch seconds of merge / commit
 // })
 //
 // (:Issue {
+//   id: STRING,            // "issue_<number>"
 //   number: INTEGER,       // Issue number
 //   title: STRING,         // Issue title
 //   state: STRING,         // "open" | "closed"
-//   created_at: INTEGER    // Epoch timestamp in milliseconds
+//   url: STRING,           // https://github.com/<owner>/<repo>/issues/<n>
+//   created_at: INTEGER    // Epoch seconds
 // })
 //
 // (:Decision {
@@ -86,7 +101,10 @@
 // ==========================================
 //
 // (Person)-[:AUTHORED]->(PullRequest)
-// (Person)-[:REVIEWED]->(PullRequest)
+// (Person)-[:REVIEWED]->(PullRequest)         // written by the GitHub ingest stage (and showcase seeds)
+// (PullRequest)-[:CLOSES]->(Issue)            // parsed from "Fixes #n" in the PR title / body
+// (Issue)-[:AFFECTS {files}]->(Component)     // derived through the closing PR's touched files
+// (Person|Team)-[:OWNS {pattern, coverage}]->(Component)  // CODEOWNERS owner of record
 // (PullRequest)-[:TOUCHES]->(File)
 // (File)-[:IN_COMPONENT]->(Component)
 // (Component)-[:DEPENDS_ON]->(Component)
@@ -109,10 +127,12 @@ CREATE INDEX FOR (p:Person) ON (p.id);
 CREATE INDEX FOR (c:Component) ON (c.name);
 CREATE INDEX FOR (f:File) ON (f.path);
 CREATE INDEX FOR (pr:PullRequest) ON (pr.number);
+CREATE INDEX FOR (pr:PullRequest) ON (pr.id);
 CREATE INDEX FOR (d:Decision) ON (d.id);
 CREATE INDEX FOR (b:Briefing) ON (b.id);
 CREATE INDEX FOR (j:IngestJob) ON (j.id);
 CREATE INDEX FOR (i:Issue) ON (i.id);
+CREATE INDEX FOR (t:Team) ON (t.id);
 CREATE INDEX FOR (u:User) ON (u.id);
 CREATE INDEX FOR (w:Workspace) ON (w.id);
 CREATE INDEX FOR (o:Organization) ON (o.id);
@@ -129,6 +149,7 @@ CREATE INDEX FOR (o:Organization) ON (o.id);
 // IngestJob.id UNIQUE
 // Briefing.id UNIQUE
 // Issue.id UNIQUE
+// Team.id UNIQUE
 // User.id UNIQUE
 // Workspace.id UNIQUE
 // Organization.id UNIQUE

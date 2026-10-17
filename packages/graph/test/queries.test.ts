@@ -10,6 +10,8 @@ import {
   precedentSearch,
   pathBetween,
   componentOverview,
+  revertHistory,
+  RevertHistoryParamsSchema,
   ResolveScopeParamsSchema,
   BlastRadiusParamsSchema,
   RiskRankingParamsSchema,
@@ -89,6 +91,13 @@ describe('Offline Contracts & Cytoscape Transformer Suite', () => {
       expect(() => PrecedentSearchParamsSchema.parse({ queryVector: vec768 })).toThrow();
       const vec256 = new Array(256).fill(0.01);
       expect(() => PrecedentSearchParamsSchema.parse({ queryVector: vec256 })).toThrow();
+    });
+
+    it('validates RevertHistoryParams requirements and defaults', () => {
+      expect(() => RevertHistoryParamsSchema.parse({ files: [] })).toThrow();
+      expect(() => RevertHistoryParamsSchema.parse({ files: ['a.ts'], limit: 1000 })).toThrow();
+      const valid = RevertHistoryParamsSchema.parse({ files: ['a.ts'] });
+      expect(valid.limit).toBe(20);
     });
 
     it('validates PathBetweenParams and ComponentOverviewParams non-empty constraints', () => {
@@ -245,7 +254,7 @@ describe('Offline Contracts & Cytoscape Transformer Suite', () => {
   });
 });
 
-describe('FalkorDB 8 Named Queries Integration', () => {
+describe('FalkorDB 9 Named Queries Integration', () => {
   describe.skipIf(!isFalkorLive)('Live FalkorDB Query Assertions', () => {
     const testWorkspace = `test_queries_${Date.now()}`;
     let client: ArgonGraphClient;
@@ -410,6 +419,32 @@ describe('FalkorDB 8 Named Queries Integration', () => {
       expect(overview.fileCount).toBe(2); // src/auth.ts, src/session.ts
       expect(overview.decisionCount).toBe(2); // D-01, D-02
       expect(overview.dependencies).toContain('Database');
+    });
+
+    it('09: revertHistory returns revert PRs touching the files together with what they reverted', async () => {
+      await client.query(
+        testWorkspace,
+        `MATCH (f:File {path: 'src/auth.ts'})
+         CREATE (orig:PullRequest {id: 'pr_orig', title: 'Extend JWT lifetime', merged_at: 1500, is_revert: false})
+         CREATE (rev:PullRequest {id: 'pr_rev', title: 'Revert: Extend JWT lifetime', merged_at: 1600, is_revert: true})
+         CREATE (rev)-[:REVERTS]->(orig)
+         CREATE (rev)-[:TOUCHES]->(f)
+         CREATE (orig)-[:TOUCHES]->(f)`
+      );
+
+      const res = await revertHistory(client, testWorkspace, { files: ['src/auth.ts', 'src/db.ts'], limit: 20 });
+      expect(res.raw).toHaveLength(1);
+      const row = res.raw[0] as any;
+      expect(row.node.properties.id).toBe('pr_rev');
+      expect(row.reverted.properties.id).toBe('pr_orig');
+      expect(row.files).toEqual(['src/auth.ts']);
+      // the revert PR is a primary evidence id (so it can be cited), the reverted one is graph context
+      expect(res.evidence.primaryIds).toContain('pr_rev');
+      expect(res.graph.nodes.map((n) => n.data.id)).toContain('pr_orig');
+
+      // non-revert PRs and untouched files do not leak in
+      const none = await revertHistory(client, testWorkspace, { files: ['src/db.ts'], limit: 20 });
+      expect(none.raw).toHaveLength(0);
     });
   });
 });
