@@ -20,11 +20,14 @@ export function useWorkspaceResource<T>(
   getToken: () => Promise<string | null>,
   enabled = true,
   /** Reload when the signed-in identity changes (guest session established, sign-in/out). */
-  identityKey: string | null = null
+  identityKey: string | null = null,
+  /** Extra URL parameters for the request (e.g. `{ view: 'files' }`); a change reloads. */
+  query?: Record<string, string>
 ): ResourceState<T> {
   const [state, setState] = useState<ResourceState<T>>({ status: 'loading', workspaceId });
   const getTokenRef = useRef(getToken);
   getTokenRef.current = getToken;
+  const queryKey = query ? JSON.stringify(query) : '';
 
   useEffect(() => {
     if (!enabled || !workspaceId) return;
@@ -34,7 +37,13 @@ export function useWorkspaceResource<T>(
     (async () => {
       const token = await getTokenRef.current().catch(() => null);
       if (controller.signal.aborted) return;
-      const result = await fetchWorkspaceResource<T>(workspaceId, resource, token, controller.signal);
+      const result = await fetchWorkspaceResource<T>(
+        workspaceId,
+        resource,
+        token,
+        controller.signal,
+        queryKey ? (JSON.parse(queryKey) as Record<string, string>) : undefined
+      );
       if (controller.signal.aborted) return;
       setState(
         result.ok
@@ -44,7 +53,7 @@ export function useWorkspaceResource<T>(
     })();
 
     return () => controller.abort();
-  }, [workspaceId, resource, enabled, identityKey]);
+  }, [workspaceId, resource, enabled, identityKey, queryKey]);
 
   // Even for the one render between a workspace change and the effect running, never expose
   // another workspace's data.

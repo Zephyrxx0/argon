@@ -1,5 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
-import { loadContributors, loadOverview, roleFor, OVERVIEW_LIMITS } from '@/lib/workspace-data';
+import {
+  loadContributors,
+  loadOverview,
+  loadFileGraph,
+  roleFor,
+  OVERVIEW_LIMITS,
+  FILE_GRAPH_LIMITS,
+} from '@/lib/workspace-data';
 import { formatLastActive, toContributor } from '@/components/contributor/contributor-picker';
 import type { ArgonGraphClient } from '@argon/graph';
 
@@ -134,6 +141,82 @@ describe('loadOverview', () => {
   });
 });
 
+describe('loadFileGraph', () => {
+  const edgeRows = [
+    { source: 'src/a.ts', target: 'src/b.ts', weight: 0.9, count: 8 },
+    { source: 'src/b.ts', target: 'src/c.ts', weight: 0.5, count: 4 },
+    { source: 'src/a.ts', target: 'src/a.ts', weight: 1, count: 9 }, // self loop: ignored
+  ];
+  const meta = [
+    { path: 'src/a.ts', component: 'src', touches: 12 },
+    { path: 'src/b.ts', component: 'src', touches: 9 },
+    { path: 'src/c.ts', component: null, touches: 4 },
+  ];
+
+  it('draws co-changing files and their strongest relationships', async () => {
+    const { client, roQuery } = fakeClient([
+      ['r.weight, 0) AS weight', edgeRows],
+      ['count(f) AS total', [{ total: 40 }]],
+      ['count(r) AS total', [{ total: 2 }]],
+      ['f.path IN $paths', meta],
+    ]);
+
+    const { elements, stats } = await loadFileGraph(client, 'ws-a');
+
+    expect(elements.nodes.map((n) => n.data.id)).toEqual(['src/a.ts', 'src/b.ts', 'src/c.ts']);
+    expect(elements.nodes[0]!.data).toMatchObject({
+      type: 'File',
+      properties: { path: 'src/a.ts', component: 'src', touches: 12 },
+    });
+    expect(elements.nodes[2]!.data.properties).toMatchObject({ component: null, touches: 4 });
+    expect(elements.edges).toHaveLength(2);
+    expect(elements.edges[0]!.data).toMatchObject({
+      id: 'co:src/a.ts->src/b.ts',
+      label: 'CO_CHANGES',
+      properties: { weight: 0.9, count: 8 },
+    });
+    expect(stats).toEqual({ files: 3, totalFiles: 40, edges: 2, totalEdges: 2, truncated: false });
+    // metadata is fetched only for the files that are drawn, against the requested workspace only
+    const metaCall = roQuery.mock.calls.find(([, cypher]) => String(cypher).includes('f.path IN $paths'))!;
+    expect(metaCall[2]).toEqual({ paths: ['src/a.ts', 'src/b.ts', 'src/c.ts'] });
+    expect(roQuery.mock.calls.every(([ws]) => ws === 'ws-a')).toBe(true);
+  });
+
+  it('caps files and edges, strongest relationships first, and reports truncation', async () => {
+    // a star: hub <-> f0..f99, weights descending
+    const star = Array.from({ length: 100 }, (_, i) => ({
+      source: 'hub',
+      target: `f${i}`,
+      weight: 1 - i / 200,
+      count: 5,
+    }));
+    const { client } = fakeClient([
+      ['r.weight, 0) AS weight', star],
+      ['count(f) AS total', [{ total: 500 }]],
+      ['count(r) AS total', [{ total: 100 }]],
+      ['f.path IN $paths', []],
+    ]);
+
+    const { elements, stats } = await loadFileGraph(client, 'ws-a');
+
+    expect(elements.nodes).toHaveLength(FILE_GRAPH_LIMITS.files);
+    expect(elements.edges).toHaveLength(FILE_GRAPH_LIMITS.files - 1);
+    expect(elements.edges[0]!.data.target).toBe('f0'); // strongest kept
+    expect(elements.edges.some((e) => e.data.target === 'f99')).toBe(false);
+    expect(stats.truncated).toBe(true);
+    const ids = new Set(elements.nodes.map((n) => n.data.id));
+    expect(elements.edges.every((e) => ids.has(e.data.source) && ids.has(e.data.target))).toBe(true);
+  });
+
+  it('gives an empty graph (and no metadata query) when no co-change edges exist', async () => {
+    const { client, roQuery } = fakeClient([['count(f) AS total', [{ total: 7 }]]]);
+    const { elements, stats } = await loadFileGraph(client, 'ws-empty');
+    expect(elements).toEqual({ nodes: [], edges: [] });
+    expect(stats).toMatchObject({ files: 0, totalFiles: 7, edges: 0, truncated: false });
+    expect(roQuery.mock.calls.some(([, cypher]) => String(cypher).includes('f.path IN $paths'))).toBe(false);
+  });
+});
+
 describe('githubAvatarUrl', () => {
   it('builds an avatar URL for plausible GitHub logins only', async () => {
     const { githubAvatarUrl } = await import('@/lib/workspace-data');
@@ -166,5 +249,29 @@ describe('githubAvatarUrl', () => {
 
     const people = await loadContributors(client, 'ws');
     expect(people[0]!.avatarUrl).toBe('https://avatars.githubusercontent.com/Zephyrxx0?size=80');
+  });
+
+  it('derives the avatar from github_login when the display name is a human name (overview + contributors)', async () => {
+    const { loadOverview, loadContributors } = await import('@/lib/workspace-data');
+    const { vi } = await import('vitest');
+    // display_name is "Jane Doe" (not a valid GitHub handle); the login "jane-dev" is.
+    const roQuery = vi.fn().mockImplementation((_ws: string, cypher: string) => {
+      if (cypher.includes('count(DISTINCT f) AS files')) return Promise.resolve({ data: [{ name: 'lib', files: 3 }] });
+      if (cypher.includes('AUTHORED]->(pr:PullRequest)-[:TOUCHES]'))
+        return Promise.resolve({ data: [{ id: 'p1', name: 'Jane Doe', login: 'jane-dev', component: 'lib', prs: 9 }] });
+      if (cypher.includes('p.display_name'))
+        return Promise.resolve({ data: [{ id: 'p1', name: 'Jane Doe', login: 'jane-dev', authored: 9, lastActive: null }] });
+      return Promise.resolve({ data: [] });
+    });
+    const client = { roQuery } as any;
+
+    const { elements } = await loadOverview(client, 'ws');
+    const person = elements.nodes.find((n) => n.data.type === 'Person')!;
+    expect(person.data.label).toBe('Jane Doe');
+    expect(person.data.properties.avatarUrl).toBe('https://avatars.githubusercontent.com/jane-dev?size=80');
+
+    const people = await loadContributors(client, 'ws');
+    expect(people[0]!.name).toBe('Jane Doe');
+    expect(people[0]!.avatarUrl).toBe('https://avatars.githubusercontent.com/jane-dev?size=80');
   });
 });

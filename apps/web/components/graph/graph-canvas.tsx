@@ -26,6 +26,7 @@ import {
   type NodeKind,
 } from '@/lib/graph/model';
 import { NodeInspector, type InspectedNode } from '@/components/canvas/node-inspector';
+import type { GraphView } from '@/lib/workspace-data';
 import { nodeTypes } from './nodes';
 import { edgeTypes } from './edges';
 import { GraphHud } from './graph-hud';
@@ -36,6 +37,11 @@ export interface GraphCanvasProps {
   elements?: GraphElements | null;
   /** What to show instead of a graph while there is none. */
   status?: { kind: 'loading' | 'error' | 'empty'; message?: string };
+  /** Which graph is shown. With `onViewChange` the HUD offers the Overview/Files toggle. */
+  view?: GraphView;
+  onViewChange?: (view: GraphView) => void;
+  /** Shown in the legend: what the current view's edges mean / how much was cut. */
+  viewNote?: string;
   onNodeSelect?: (nodeId: string) => void;
   className?: string;
 }
@@ -54,7 +60,7 @@ const MINIMAP_SHADE: Record<NodeKind, string> = {
   entity: '#555555',
 };
 
-function GraphCanvasInner({ elements, status, onNodeSelect, className }: GraphCanvasProps) {
+function GraphCanvasInner({ elements, status, view, onViewChange, viewNote, onNodeSelect, className }: GraphCanvasProps) {
   const { fitView } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
   const { hoveredNodeId, selectedNodeId, focusRequest, setSelectedNode, lastSyncEvent } = useGraphSync();
@@ -71,6 +77,18 @@ function GraphCanvasInner({ elements, status, onNodeSelect, className }: GraphCa
   const [supersededIds, setSupersededIds] = useState<Set<string>>(new Set());
 
   const source = useMemo<GraphElements>(() => elements ?? { nodes: [], edges: [] }, [elements]);
+
+  // Switching between graph views starts from a clean slate: nodes of the other view no longer
+  // exist, so selection, the inspector and legend filters must not carry over.
+  const previousViewRef = useRef(view);
+  useEffect(() => {
+    if (previousViewRef.current === view) return;
+    previousViewRef.current = view;
+    setInspectedId(null);
+    setSelectedNode(null);
+    setHiddenKinds(new Set());
+    setLocalHover(null);
+  }, [view, setSelectedNode]);
 
   // 1. Parse → 2. filter by legend → 3. layout (all pure, memoised)
   const parsedBase = useMemo(() => buildFlowGraph(source, 'LR'), [source]);
@@ -284,7 +302,7 @@ function GraphCanvasInner({ elements, status, onNodeSelect, className }: GraphCa
         )}
       </ReactFlow>
 
-      <GraphLegend counts={counts} hidden={hiddenKinds} onToggle={toggleKind} />
+      <GraphLegend counts={counts} hidden={hiddenKinds} onToggle={toggleKind} note={viewNote} />
 
       {empty && (
         <div
@@ -310,6 +328,8 @@ function GraphCanvasInner({ elements, status, onNodeSelect, className }: GraphCa
         direction={direction}
         onDirectionChange={setManualDirection}
         onRelayout={() => setLayoutNonce((n) => n + 1)}
+        view={view}
+        onViewChange={onViewChange}
       />
 
       <NodeInspector

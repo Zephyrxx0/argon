@@ -39,7 +39,7 @@ export function StickyJumpBar({ counts = {}, className }: StickyJumpBarProps) {
   return (
     <div
       className={clsx(
-        'sticky top-0 z-20 border-b border-border bg-card/95 backdrop-blur-md px-3 py-2 font-mono flex items-center gap-1.5 overflow-x-auto no-scrollbar select-none',
+        'sticky top-[var(--briefing-bar-h,0px)] z-20 border-b border-border bg-card/95 backdrop-blur-md px-3 py-2 font-mono flex items-center gap-1.5 overflow-x-auto no-scrollbar select-none',
         className
       )}
       data-testid="sticky-jump-bar"

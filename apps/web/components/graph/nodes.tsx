@@ -211,15 +211,27 @@ export const FileNode = memo(function FileNode({ data }: NodeProps<FlowNode>) {
   const slash = path.lastIndexOf('/');
   const dir = slash >= 0 ? path.slice(0, slash + 1) : '';
   const base = slash >= 0 ? path.slice(slash + 1) : path;
+  const component = str(data.properties.component);
+  const touches = data.properties.touches;
+  const meta = [component, touches != null ? `${touches} change${Number(touches) === 1 ? '' : 's'}` : null]
+    .filter(Boolean)
+    .join(' · ');
   return (
     <NodeShell data={data} kind="file">
       <div className="flex h-full items-center gap-2 px-3" title={path}>
         <span aria-hidden="true" className={clsx('shrink-0 text-[10px]', muted(data.selected))}>
           ▤
         </span>
-        <span className="min-w-0 flex-1 truncate text-[12px] leading-4">
-          {dir && <span className={muted(data.selected)}>{dir}</span>}
-          <span className="font-bold">{base}</span>
+        <span className="flex min-w-0 flex-1 flex-col justify-center">
+          <span className="truncate text-[12px] leading-4">
+            {dir && <span className={muted(data.selected)}>{dir}</span>}
+            <span className="font-bold">{base}</span>
+          </span>
+          {meta && (
+            <span className={clsx('truncate text-[10px] uppercase leading-[14px] tracking-wider', muted(data.selected))}>
+              {meta}
+            </span>
+          )}
         </span>
       </div>
     </NodeShell>

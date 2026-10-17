@@ -22,6 +22,9 @@ export interface HeaderBarProps {
   onSelectWorkspace: (id: string) => void;
   onIngestSuccess?: (workspace: Workspace) => void;
   onRemoveWorkspace?: (id: string) => void;
+  onResyncComplete?: (id: string) => void;
+  /** Increments after each finished re-sync (reloads the contributor list). */
+  resyncVersion?: number;
   currentContributorId?: string | null;
   onSelectContributor: (id: string | null) => void;
   className?: string;
@@ -37,6 +40,8 @@ export function HeaderBar({
   onSelectWorkspace,
   onIngestSuccess,
   onRemoveWorkspace,
+  onResyncComplete,
+  resyncVersion = 0,
   currentContributorId = null,
   onSelectContributor,
   className,
@@ -86,12 +91,14 @@ export function HeaderBar({
           onSelectWorkspace={onSelectWorkspace}
           onIngestSuccess={onIngestSuccess}
           onRemoveWorkspace={onRemoveWorkspace}
+          onResyncComplete={onResyncComplete}
         />
 
         <ContributorPicker
           workspaceId={currentWorkspaceId}
           currentContributorId={currentContributorId}
           onSelectContributor={onSelectContributor}
+          reloadKey={resyncVersion}
         />
 
         {/* Identity Cluster (Immediately to the right of ContributorPicker - D-02) */}

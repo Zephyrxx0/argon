@@ -56,6 +56,8 @@ export interface ContributorPickerProps {
   contributors?: Contributor[];
   currentContributorId?: string | null;
   onSelectContributor: (contributorId: string | null) => void;
+  /** Change to reload the list (e.g. after the workspace was re-synced). */
+  reloadKey?: number;
   className?: string;
 }
 
@@ -64,6 +66,7 @@ export function ContributorPicker({
   contributors: contributorsProp,
   currentContributorId = null,
   onSelectContributor,
+  reloadKey = 0,
   className,
 }: ContributorPickerProps) {
   const { user, isAnonymous, getToken } = useAuth();
@@ -73,7 +76,7 @@ export function ContributorPicker({
     getToken,
     // an explicit list (or no workspace) means there is nothing to load
     !contributorsProp && Boolean(workspaceId),
-    user?.id ?? null
+    `${user?.id ?? ''}#${reloadKey}`
   );
   const contributors: Contributor[] = useMemo(() => {
     if (contributorsProp) return contributorsProp;
@@ -193,6 +196,7 @@ export function ContributorPicker({
                 placeholder="Search author by name or role..."
                 className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none font-mono"
                 autoFocus
+                data-no-focus-ring
                 data-testid="contributor-search-input"
               />
               {search && (
@@ -252,7 +256,7 @@ export function ContributorPicker({
                         <img
                           src={contributor.avatarUrl}
                           alt={contributor.name}
-                          className="w-4 h-4 rounded-full border border-border shrink-0 object-cover"
+                          className="w-7 h-7 rounded-full border border-border shrink-0 object-cover"
                         />
                       ) : null}
                       <div className="space-y-0.5 truncate">

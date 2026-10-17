@@ -39,6 +39,10 @@ export const RelationEdge = memo(function RelationEdge({
   const visual = data?.visual ?? 'idle';
   const supersession = data?.supersession ?? false;
   const stroke = supersession ? 'var(--color-danger)' : visual === 'active' ? '#ffffff' : '#5a5a5a';
+  // Coupling strength (0..1) reads as line thickness: 1px for weak ... 3.5px for tight coupling
+  const weightWidth = data?.weight != null ? 1 + data.weight * 2.5 : null;
+  const strokeWidth = (weightWidth ?? 1.25) + (visual === 'active' ? 0.75 : 0);
+  const labelText = data?.caption ?? data?.label?.replace(/_/g, ' ');
 
   return (
     <>
@@ -50,12 +54,12 @@ export const RelationEdge = memo(function RelationEdge({
         className={clsx(visual === 'active' && 'argon-edge-march')}
         style={{
           stroke,
-          strokeWidth: visual === 'active' ? 2 : 1.25,
+          strokeWidth,
           strokeDasharray: supersession ? '6 4' : visual === 'active' ? '8 6' : undefined,
           opacity: visual === 'dim' ? 0.15 : 1,
         }}
       />
-      {data?.label && (
+      {labelText && (
         <EdgeLabelRenderer>
           <div
             style={{
@@ -71,7 +75,7 @@ export const RelationEdge = memo(function RelationEdge({
                   : 'border-[#4a4a4a] text-[#9a9a9a]'
             )}
           >
-            {data.label.replace(/_/g, ' ')}
+            {labelText}
           </div>
         </EdgeLabelRenderer>
       )}

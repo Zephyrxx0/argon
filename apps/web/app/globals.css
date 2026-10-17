@@ -74,7 +74,9 @@ body {
   outline-offset: 2px;
 }
 [data-command-input]:focus,
-[data-command-input]:focus-visible {
+[data-command-input]:focus-visible,
+[data-no-focus-ring]:focus,
+[data-no-focus-ring]:focus-visible {
   outline: none;
 }
 

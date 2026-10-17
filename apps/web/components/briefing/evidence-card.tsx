@@ -1,11 +1,29 @@
 'use client';
 
 import React from 'react';
-import { Crosshair, ExternalLink, ShieldCheck, AlertOctagon, GitCommit, FileCode, Box, User, ArrowRight } from 'lucide-react';
+import { Crosshair, ExternalLink, ShieldCheck, AlertOctagon, GitCommit, FileCode, Box, User, Users, ArrowRight, GitPullRequest, CircleDot } from 'lucide-react';
 import { useGraphSync } from '@/lib/graph-sync';
 import { clsx } from 'clsx';
 
-export type EvidenceNodeType = 'DECISION' | 'COMPONENT' | 'FILE' | 'PERSON';
+export type EvidenceNodeType = 'DECISION' | 'COMPONENT' | 'FILE' | 'PERSON' | 'TEAM';
+
+/** A link to where a fact came from (pull request, issue, commit...). */
+export interface EvidenceLink {
+  kind: 'pull_request' | 'issue' | 'commit' | 'document' | 'decision';
+  label: string;
+  url: string;
+  state?: string;
+}
+
+function isHttpUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  try {
+    const u = new URL(value);
+    return u.protocol === 'https:' || u.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
 
 export interface EvidenceCardProps {
   id: string;
@@ -17,6 +35,10 @@ export interface EvidenceCardProps {
   validTo?: string;
   supersededBy?: string;
   sourceUrl?: string;
+  /** Where this node was extracted from: its pull request and the issue that PR closed. */
+  links?: EvidenceLink[];
+  /** Hide the validity badge (people / teams are not "in force"). */
+  hideValidity?: boolean;
   properties?: Record<string, string | number | boolean>;
   className?: string;
 }
@@ -31,12 +53,17 @@ export function EvidenceCard({
   validTo,
   supersededBy,
   sourceUrl,
+  links,
+  hideValidity = false,
   properties,
   className,
 }: EvidenceCardProps) {
   const { hoveredNodeId, selectedNodeId, setHoveredNode, focusNode } = useGraphSync();
 
   const cleanId = id.startsWith('#') ? id.slice(1) : id;
+  // Links come from graph properties, but a card never renders a non-http(s) href
+  const safeSourceUrl = isHttpUrl(sourceUrl) ? sourceUrl : undefined;
+  const safeLinks = (links ?? []).filter((l) => isHttpUrl(l.url));
   const isHovered = hoveredNodeId === cleanId || hoveredNodeId === id;
   const isSelected = selectedNodeId === cleanId || selectedNodeId === id;
 
@@ -61,6 +88,11 @@ export function EvidenceCard({
         return {
           badge: 'border-foreground/40 bg-foreground/5 text-foreground',
           icon: <User className="w-3 h-3 text-foreground" />,
+        };
+      case 'TEAM':
+        return {
+          badge: 'border-foreground/40 bg-foreground/5 text-foreground',
+          icon: <Users className="w-3 h-3 text-foreground" />,
         };
     }
   };
@@ -113,7 +145,7 @@ export function EvidenceCard({
               [{validFrom ?? 'origin'} → {validTo ?? 'present'}]
             </span>
           )}
-          {validity === 'SUPERSEDED' ? (
+          {hideValidity ? null : validity === 'SUPERSEDED' ? (
             <span
               data-testid="evidence-superseded-badge"
               className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold text-danger border border-danger/40 bg-danger/10"
@@ -166,11 +198,33 @@ export function EvidenceCard({
         </div>
       )}
 
+      {/* Provenance: the pull request / issue this node was extracted from */}
+      {safeLinks.length > 0 && (
+        <div data-testid="evidence-provenance" className="flex flex-wrap items-center gap-1.5 text-[10px]">
+          <span className="text-muted-foreground/70 uppercase tracking-wider">Extracted from</span>
+          {safeLinks.map((l) => (
+            <a
+              key={`${l.kind}:${l.url}`}
+              href={l.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid={`evidence-link-${l.kind}`}
+              title={l.label}
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 border border-border bg-background/50 text-foreground hover:border-accent hover:text-accent transition-colors"
+            >
+              {l.kind === 'issue' ? <CircleDot className="w-3 h-3" /> : <GitPullRequest className="w-3 h-3" />}
+              <span>{l.label.length > 38 ? `${l.label.slice(0, 37)}…` : l.label}</span>
+              {l.state && <span className="text-muted-foreground">({l.state})</span>}
+            </a>
+          ))}
+        </div>
+      )}
+
       {/* Footer Actions: Provenance Source Link & Focus In Graph */}
       <div className="pt-2 border-t border-border/60 flex items-center justify-between gap-3 text-xs">
-        {sourceUrl ? (
+        {safeSourceUrl ? (
           <a
-            href={sourceUrl}
+            href={safeSourceUrl}
             target="_blank"
             rel="noopener noreferrer"
             data-testid="evidence-source-link"

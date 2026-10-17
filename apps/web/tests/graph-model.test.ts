@@ -57,6 +57,41 @@ describe('graph model', () => {
   });
 });
 
+describe('co-change (file) graph elements', () => {
+  const files: GraphElements = {
+    nodes: [
+      node('src/a.ts', 'File', { path: 'src/a.ts', component: 'src', touches: 12 }),
+      node('src/b.ts', 'File', { path: 'src/b.ts', component: 'src', touches: 9 }),
+    ],
+    edges: [
+      { data: { id: 'co:src/a.ts->src/b.ts', source: 'src/a.ts', target: 'src/b.ts', label: 'CO_CHANGES', properties: { weight: 0.62, count: 5 } } },
+      // other relations never get a weight/caption, whatever their properties hold
+      { data: { id: 'own', source: 'src/a.ts', target: 'src/b.ts', label: 'OWNS', properties: { weight: 0.9, count: 3 } } },
+    ],
+  };
+
+  it('turns CO_CHANGES strength into edge weight and an `N×` caption', () => {
+    const { nodes, edges } = buildFlowGraph(files);
+    expect(nodes.every((n) => n.type === 'file' && n.data.kind === 'file')).toBe(true);
+    expect(edges[0]!.data).toMatchObject({ label: 'CO_CHANGES', weight: 0.62, caption: '5×', supersession: false });
+    expect(edges[1]!.data).not.toHaveProperty('weight');
+    expect(edges[1]!.data).not.toHaveProperty('caption');
+  });
+
+  it('clamps out-of-range weights and ignores missing ones', () => {
+    const { edges } = buildFlowGraph({
+      nodes: files.nodes,
+      edges: [
+        { data: { id: 'x', source: 'src/a.ts', target: 'src/b.ts', label: 'CO_CHANGES', properties: { weight: 7, count: 2 } } },
+        { data: { id: 'y', source: 'src/b.ts', target: 'src/a.ts', label: 'CO_CHANGES', properties: {} } },
+      ],
+    });
+    expect(edges[0]!.data!.weight).toBe(1);
+    expect(edges[1]!.data).not.toHaveProperty('weight');
+    expect(edges[1]!.data).not.toHaveProperty('caption');
+  });
+});
+
 describe('graph layout', () => {
   const { nodes, edges } = buildFlowGraph(elements);
 

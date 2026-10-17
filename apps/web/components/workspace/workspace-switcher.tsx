@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { GitFork, ChevronDown, Plus, Check, Trash2 } from 'lucide-react';
+import { GitFork, ChevronDown, Plus, Check, Trash2, RefreshCw } from 'lucide-react';
 import { IngestModal } from './ingest-modal';
 import { clsx } from 'clsx';
+import { useAuth } from '@/app/providers';
+import { startRefresh, waitForIngest } from '@/lib/ingest-client';
 
 export interface Workspace {
   id: string;
@@ -64,8 +66,12 @@ export interface WorkspaceSwitcherProps {
   onSelectWorkspace: (id: string) => void;
   onIngestSuccess?: (workspace: Workspace) => void;
   onRemoveWorkspace?: (id: string) => void;
+  /** Called after a re-sync of one of the user's workspaces finished, so its data can be reloaded. */
+  onResyncComplete?: (id: string) => void;
   className?: string;
 }
+
+type ResyncState = { phase: 'running' } | { phase: 'done' } | { phase: 'error'; message: string };
 
 export function WorkspaceSwitcher({
   workspaces: baseWorkspaces = SHOWCASE_WORKSPACES,
@@ -74,8 +80,11 @@ export function WorkspaceSwitcher({
   onSelectWorkspace,
   onIngestSuccess,
   onRemoveWorkspace,
+  onResyncComplete,
   className,
 }: WorkspaceSwitcherProps) {
+  const { getToken } = useAuth();
+  const [resync, setResync] = useState<Record<string, ResyncState>>({});
   const [customWorkspaces, setCustomWorkspaces] = useState<Workspace[]>([]);
   // Ingested repositories live in FalkorDB; remember them per account so they survive a reload
   // but never show for a different account.
@@ -126,6 +135,24 @@ export function WorkspaceSwitcher({
   };
 
   const isCustom = (id: string) => customWorkspaces.some((w) => w.id === id);
+
+  // Re-sync = re-read the repository (new commits, and GitHub PRs / reviews / issues since the last
+  // ingestion). Only for workspaces the user ingested; the showcase graphs are static.
+  const handleResync = async (workspace: Workspace) => {
+    if (resync[workspace.id]?.phase === 'running') return;
+    setResync((prev) => ({ ...prev, [workspace.id]: { phase: 'running' } }));
+    try {
+      const started = await startRefresh(workspace.id, await getToken());
+      await waitForIngest(workspace.id, { getToken, jobId: started.jobId });
+      setResync((prev) => ({ ...prev, [workspace.id]: { phase: 'done' } }));
+      onResyncComplete?.(workspace.id);
+    } catch (err) {
+      setResync((prev) => ({
+        ...prev,
+        [workspace.id]: { phase: 'error', message: (err as Error)?.message || 'Re-sync failed' },
+      }));
+    }
+  };
 
   const handleRemove = (id: string) => {
     setCustomWorkspaces((prev) => {
@@ -211,6 +238,21 @@ export function WorkspaceSwitcher({
                     {custom && (
                       <button
                         type="button"
+                        onClick={() => handleResync(workspace)}
+                        disabled={resync[workspace.id]?.phase === 'running'}
+                        data-testid={`workspace-resync-${workspace.id}`}
+                        aria-label={`Re-sync workspace ${workspace.name}`}
+                        title="Re-sync: read new commits, pull requests, reviews and issues"
+                        className="shrink-0 px-2 py-2 text-muted-foreground opacity-0 transition-opacity hover:text-accent focus-visible:opacity-100 group-hover:opacity-100 disabled:opacity-100 disabled:text-accent"
+                      >
+                        <RefreshCw
+                          className={clsx('w-3.5 h-3.5', resync[workspace.id]?.phase === 'running' && 'animate-spin')}
+                        />
+                      </button>
+                    )}
+                    {custom && (
+                      <button
+                        type="button"
                         onClick={() => handleRemove(workspace.id)}
                         data-testid={`workspace-remove-${workspace.id}`}
                         aria-label={`Remove workspace ${workspace.name}`}
@@ -224,6 +266,44 @@ export function WorkspaceSwitcher({
                 );
               })}
             </div>
+
+            {Object.entries(resync).map(([id, st]) => {
+              const name = workspaces.find((w) => w.id === id)?.name ?? id;
+              if (st.phase === 'done') {
+                return (
+                  <div
+                    key={id}
+                    role="status"
+                    data-testid={`workspace-resync-status-${id}`}
+                    className="px-3 py-1.5 border-t border-border text-[10px] text-success"
+                  >
+                    {name}: re-synced
+                  </div>
+                );
+              }
+              if (st.phase === 'error') {
+                return (
+                  <div
+                    key={id}
+                    role="alert"
+                    data-testid={`workspace-resync-status-${id}`}
+                    className="px-3 py-1.5 border-t border-border text-[10px] text-danger"
+                  >
+                    {name}: {st.message}
+                  </div>
+                );
+              }
+              return (
+                <div
+                  key={id}
+                  role="status"
+                  data-testid={`workspace-resync-status-${id}`}
+                  className="px-3 py-1.5 border-t border-border text-[10px] text-muted-foreground"
+                >
+                  {name}: re-syncing…
+                </div>
+              );
+            })}
 
             {/* Ingest Repository Trigger */}
             <div className="p-1.5 border-t border-border bg-muted/20">

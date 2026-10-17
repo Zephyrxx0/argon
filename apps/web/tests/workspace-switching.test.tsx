@@ -18,6 +18,20 @@ const overviewFor = (ws: string) => ({
   stats: { components: 1, files: 3, decisions: 0, people: 1, truncated: false },
 });
 
+const fileGraphFor = (ws: string) => ({
+  workspaceId: ws,
+  elements: {
+    nodes: [
+      { data: { id: `${ws}/a.ts`, label: `${ws}/a.ts`, type: 'File', properties: { path: `${ws}/a.ts`, component: 'src', touches: 4 } } },
+      { data: { id: `${ws}/b.ts`, label: `${ws}/b.ts`, type: 'File', properties: { path: `${ws}/b.ts`, component: 'src', touches: 3 } } },
+    ],
+    edges: [
+      { data: { id: 'co:1', source: `${ws}/a.ts`, target: `${ws}/b.ts`, label: 'CO_CHANGES', properties: { weight: 0.5, count: 6 } } },
+    ],
+  },
+  stats: { files: 2, totalFiles: 9, edges: 1, totalEdges: 1, truncated: false },
+});
+
 const contributorsFor = (ws: string) => ({
   workspaceId: ws,
   contributors: [
@@ -50,6 +64,7 @@ function installFetch(opts: { deferBriefing?: boolean } = {}) {
     const m = /\/api\/workspace\/([^/]+)\/(overview|contributors|files|supersessions)/.exec(u);
     if (m) {
       const ws = decodeURIComponent(m[1]!);
+      if (m[2] === 'overview' && u.includes('view=files')) return json(fileGraphFor(ws));
       if (m[2] === 'overview') return json(overviewFor(ws));
       if (m[2] === 'contributors') return json(contributorsFor(ws));
       if (m[2] === 'files') return json({ workspaceId: ws, files: [], truncated: false });
@@ -95,6 +110,66 @@ describe('Workspace switching keeps graph, briefing and contributors scoped to t
         <WorkspacePage />
       </AuthProvider>
     );
+
+  it('toggles the canvas to the workspace\'s file co-change graph and back, resetting on workspace switch', async () => {
+    installFetch();
+    renderPage();
+    expect((await screen.findAllByText('comp-ember-adr-showcase')).length).toBeGreaterThan(0);
+
+    // the Files graph is only requested once selected
+    const urls = () => (global.fetch as any).mock.calls.map((c: unknown[]) => String(c[0]));
+    expect(urls().some((u: string) => u.includes('view=files'))).toBe(false);
+
+    fireEvent.click(visible('hud-view-files'));
+    expect((await screen.findAllByText('a.ts')).length).toBeGreaterThan(0);
+    expect(screen.queryAllByText('comp-ember-adr-showcase')).toHaveLength(0);
+    expect(visible('hud-view-files')).toHaveAttribute('aria-pressed', 'true');
+    expect(urls().some((u: string) => u.includes('/ember-adr-showcase/overview?view=files'))).toBe(true);
+    expect(visible('graph-legend-note').textContent).toMatch(/2\/9 files, 1\/1 links/);
+
+    fireEvent.click(visible('hud-view-overview'));
+    expect((await screen.findAllByText('comp-ember-adr-showcase')).length).toBeGreaterThan(0);
+
+    // a workspace switch always lands on that workspace's overview
+    fireEvent.click(visible('hud-view-files'));
+    await screen.findAllByText('a.ts');
+    await switchTo('synthetic-demo');
+    expect((await screen.findAllByText('comp-synthetic-demo')).length).toBeGreaterThan(0);
+    expect(visible('hud-view-overview')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('returns from a briefing to the original state (hub + overview graph with the view toggle)', async () => {
+    installFetch();
+    renderPage();
+    expect((await screen.findAllByText('comp-ember-adr-showcase')).length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('briefing-back-btn')).not.toBeInTheDocument();
+
+    await runScenario();
+    expect(await screen.findByTestId('briefing-back-btn')).toBeInTheDocument();
+    // a briefing replaces the canvas graph, so there is no view toggle meanwhile
+    await waitFor(() => expect(screen.queryAllByTestId('hud-view-toggle')).toHaveLength(0));
+
+    fireEvent.click(screen.getByTestId('briefing-back-btn'));
+    await waitFor(() => expect(screen.queryByTestId('briefing-back-btn')).not.toBeInTheDocument());
+    expect(screen.queryByTestId('briefing-view')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('scenario-card-s1-blast-radius').length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('comp-ember-adr-showcase')).length).toBeGreaterThan(0);
+    expect(visible('hud-view-overview')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('cancels a briefing that is still running when going back', async () => {
+    installFetch({ deferBriefing: true });
+    renderPage();
+    await screen.findAllByText('comp-ember-adr-showcase');
+    await runScenario();
+    const back = await screen.findByTestId('briefing-back-btn');
+    await waitFor(() => expect(pendingBriefings).toHaveLength(1));
+
+    fireEvent.click(back);
+    expect(pendingBriefings[0]!.signal?.aborted).toBe(true);
+    await waitFor(() => expect(screen.queryByTestId('briefing-back-btn')).not.toBeInTheDocument());
+    expect(screen.queryByTestId('briefing-loading-skeleton')).not.toBeInTheDocument();
+  });
 
   it('draws the selected workspace\'s own overview graph (not a hard-coded sample) and follows switches', async () => {
     installFetch();
@@ -192,4 +267,40 @@ describe('Workspace switching keeps graph, briefing and contributors scoped to t
     const post = (global.fetch as any).mock.calls.find(([u]: [string]) => String(u).includes('/api/briefing'));
     expect(JSON.parse(post[1].body).workspaceId).toBe('synthetic-demo');
   });
+
+  it('a finished re-sync reloads the workspace\'s graph and contributors (same workspace id)', async () => {
+    const wsId = 'pub-acme-widgets-abc123';
+    window.localStorage.setItem(
+      'argon.workspaces.custom.guest',
+      JSON.stringify([{ id: wsId, name: 'acme/widgets', repoUrl: 'https://github.com/acme/widgets' }])
+    );
+    installFetch();
+    const base = (global.fetch as any).getMockImplementation() as (u: string, i?: RequestInit) => Promise<unknown>;
+    global.fetch = vi.fn().mockImplementation((u: string, init?: RequestInit) => {
+      const url = String(u);
+      if (url.endsWith('/refresh')) return json({ workspaceId: wsId, jobId: 'job_new', repositoryFullName: 'acme/widgets' }, 202);
+      if (url.endsWith('/ingest-status'))
+        return json({ workspaceId: wsId, jobId: 'job_new', status: 'completed', progress: 1, error: null, nodeCount: 3 });
+      return base(url, init);
+    }) as any;
+
+    renderPage();
+    await screen.findAllByText('comp-ember-adr-showcase');
+    await switchTo(wsId);
+    await screen.findAllByText(`comp-${wsId}`);
+
+    const count = (suffix: string) =>
+      (global.fetch as any).mock.calls.filter((c: unknown[]) => String(c[0]).includes(`/api/workspace/${wsId}/${suffix}`)).length;
+    const overviewBefore = count('overview');
+    const contributorsBefore = count('contributors');
+    expect(overviewBefore).toBeGreaterThan(0);
+
+    fireEvent.click(visible('workspace-switcher-trigger'));
+    fireEvent.click(await screen.findByTestId(`workspace-resync-${wsId}`));
+
+    await waitFor(() => expect(count('overview')).toBeGreaterThan(overviewBefore), { timeout: 8000 });
+    await waitFor(() => expect(count('contributors')).toBeGreaterThan(contributorsBefore), { timeout: 8000 });
+    const refreshCalls = (global.fetch as any).mock.calls.filter((c: unknown[]) => String(c[0]).endsWith('/refresh'));
+    expect(refreshCalls).toHaveLength(1);
+  }, 20000);
 });

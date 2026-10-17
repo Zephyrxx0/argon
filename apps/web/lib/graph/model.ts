@@ -26,6 +26,10 @@ export interface GraphEdgeData extends Record<string, unknown> {
   /** true for SUPERSEDES / SUPERSEDED_BY — rendered as a state (danger) edge */
   supersession: boolean;
   visual: NodeVisual;
+  /** coupling strength 0..1 (CO_CHANGES only): drives line thickness */
+  weight?: number;
+  /** short text drawn on the edge instead of the relation name (CO_CHANGES: `5×`) */
+  caption?: string;
 }
 
 export type LayoutDirection = 'LR' | 'TB';
@@ -40,7 +44,7 @@ export const NODE_SIZE: Record<NodeKind, { width: number; height: number }> = {
   component: { width: 232, height: 92 },
   decision: { width: 252, height: 112 },
   person: { width: 216, height: 68 },
-  file: { width: 232, height: 44 },
+  file: { width: 232, height: 48 },
   entity: { width: 200, height: 56 },
 };
 
@@ -121,15 +125,21 @@ export function buildFlowGraph(
     if (!data?.id || edgeIds.has(data.id) || edges.length >= MAX_EDGES) continue;
     if (!seen.has(data.source) || !seen.has(data.target)) continue;
     edgeIds.add(data.id);
+    const label = data.label || '';
+    const coChange = label === 'CO_CHANGES';
+    const weight = Number(data.properties?.weight);
+    const count = Number(data.properties?.count);
     edges.push({
       id: data.id,
       source: data.source,
       target: data.target,
       type: 'relation',
       data: {
-        label: data.label || '',
-        supersession: isSupersession(data.label || ''),
+        label,
+        supersession: isSupersession(label),
         visual: 'idle',
+        ...(coChange && Number.isFinite(weight) ? { weight: Math.min(1, Math.max(0, weight)) } : {}),
+        ...(coChange && Number.isFinite(count) && count > 0 ? { caption: `${count}×` } : {}),
       },
     });
   }

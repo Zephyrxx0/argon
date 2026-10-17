@@ -15,17 +15,19 @@ export interface GraphLegendProps {
   counts: Partial<Record<NodeKind, number>>;
   hidden: Set<NodeKind>;
   onToggle: (kind: NodeKind) => void;
+  /** Explains what the current view's edges / caps mean (e.g. the Files view). */
+  note?: string;
   className?: string;
 }
 
 /** Doubles as the type filter: click an entry to hide/show that kind of node. */
-export function GraphLegend({ counts, hidden, onToggle, className }: GraphLegendProps) {
+export function GraphLegend({ counts, hidden, onToggle, note, className }: GraphLegendProps) {
   return (
     <div
       data-testid="graph-legend"
       role="group"
       aria-label="Filter by node type"
-      className={clsx('absolute left-4 top-4 z-20 flex border border-white/30 bg-black font-mono', className)}
+      className={clsx('absolute left-4 top-4 z-20 flex max-w-[calc(100%-2rem)] flex-wrap border border-white/30 bg-black font-mono', className)}
     >
       {ENTRIES.filter((e) => (counts[e.kind] ?? 0) > 0).map(({ kind, label, glyph }) => {
         const off = hidden.has(kind);
@@ -48,6 +50,14 @@ export function GraphLegend({ counts, hidden, onToggle, className }: GraphLegend
           </button>
         );
       })}
+      {note && (
+        <span
+          data-testid="graph-legend-note"
+          className="flex items-center px-2.5 py-1.5 text-[10px] uppercase tracking-[0.16em] text-white/55"
+        >
+          {note}
+        </span>
+      )}
     </div>
   );
 }

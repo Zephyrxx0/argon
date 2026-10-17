@@ -80,6 +80,25 @@ export async function startOwnedIngest(
   return (await res.json()) as StartedIngest;
 }
 
+/**
+ * Re-sync an existing (owned) workspace from its repository: the gateway re-mines git history and
+ * reads GitHub PRs / reviews / issues changed since the last completed ingestion. Returns the new
+ * job so progress can be followed with `waitForIngest(workspaceId, { jobId })`.
+ */
+export async function startRefresh(
+  workspaceId: string,
+  token: string | null,
+  signal?: AbortSignal
+): Promise<StartedIngest> {
+  const res = await fetch(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}/refresh`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    signal,
+  });
+  if (!res.ok) throw new Error(await readError(res, 'Could not start re-sync'));
+  return (await res.json()) as StartedIngest;
+}
+
 export async function fetchIngestStatus(
   workspaceId: string,
   token: string | null,
@@ -102,6 +121,14 @@ export interface WaitForIngestOptions {
   timeoutMs?: number;
   /** consecutive polling failures tolerated before giving up */
   maxPollErrors?: number;
+  /**
+   * Follow this specific job. The status endpoint reports the latest job of the workspace, so
+   * right after a re-sync starts it can still describe the previous (completed) one: statuses of
+   * other jobs are ignored until the awaited job shows up.
+   */
+  jobId?: string;
+  /** With `jobId`: give up when that job never appears (the server failed before recording it). */
+  startTimeoutMs?: number;
 }
 
 /**
@@ -115,6 +142,7 @@ export async function waitForIngest(
   const interval = opts.intervalMs ?? 1500;
   const deadline = Date.now() + (opts.timeoutMs ?? 10 * 60_000);
   const maxErrors = opts.maxPollErrors ?? 5;
+  const startDeadline = Date.now() + (opts.startTimeoutMs ?? 60_000);
   let errors = 0;
 
   while (true) {
@@ -124,13 +152,19 @@ export async function waitForIngest(
     try {
       const status = await fetchIngestStatus(workspaceId, await opts.getToken(), opts.signal);
       errors = 0;
-      opts.onProgress?.(status);
-      if (status.status === 'completed') return status;
-      if (status.status === 'failed') {
-        throw new IngestFailedError(status.error || 'Ingestion failed');
+      // Following one job: until it appears the endpoint still describes the previous job
+      const isAwaitedJob = !opts.jobId || status.jobId === opts.jobId;
+      if (isAwaitedJob) {
+        opts.onProgress?.(status);
+        if (status.status === 'completed') return status;
+        if (status.status === 'failed') {
+          throw new IngestFailedError(status.error || 'Ingestion failed');
+        }
+      } else if (Date.now() > startDeadline) {
+        throw new IngestNotStartedError();
       }
     } catch (err) {
-      if (err instanceof IngestFailedError) throw err;
+      if (err instanceof IngestFailedError || err instanceof IngestNotStartedError) throw err;
       if ((err as Error)?.name === 'AbortError') throw err;
       if (++errors >= maxErrors) throw err;
     }
@@ -153,5 +187,12 @@ export class IngestFailedError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'IngestFailedError';
+  }
+}
+
+export class IngestNotStartedError extends Error {
+  constructor() {
+    super('The re-sync did not start. Please try again.');
+    this.name = 'IngestNotStartedError';
   }
 }

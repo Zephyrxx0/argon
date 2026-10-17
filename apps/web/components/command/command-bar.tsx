@@ -111,6 +111,7 @@ export function CommandBar({
                 : placeholderFor(suggestions)
             }
             data-testid="command-bar-input"
+            data-command-input
             className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none font-mono tracking-tight"
           />
 

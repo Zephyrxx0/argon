@@ -62,7 +62,7 @@ export async function loadContributors(
       workspaceId,
       `MATCH (p:Person)
        OPTIONAL MATCH (p)-[:AUTHORED]->(a:PullRequest)
-       RETURN p.id AS id, coalesce(p.display_name, p.name, p.id) AS name,
+       RETURN p.id AS id, coalesce(p.display_name, p.name, p.id) AS name, p.github_login AS login,
               count(a) AS authored, max(a.merged_at) AS lastActive
        ORDER BY authored DESC LIMIT 500`
     ),
@@ -84,6 +84,7 @@ export async function loadContributors(
     .map((r) => ({
       id: str(r.id),
       name: str(r.name, str(r.id)),
+      login: str(r.login),
       authored: num(r.authored),
       reviews: reviewedBy.get(str(r.id)) ?? 0,
       lastActive: r.lastActive == null ? null : num(r.lastActive) || null,
@@ -92,7 +93,8 @@ export async function loadContributors(
     .slice(0, MAX_CONTRIBUTORS);
 
   return merged.map((p, rank) => {
-    const avatarUrl = githubAvatarUrl(p.name);
+    // Prefer the GitHub login for the avatar; fall back to the display name when it is itself a login.
+    const avatarUrl = githubAvatarUrl(p.login) ?? githubAvatarUrl(p.name);
     return {
       id: p.id,
       name: p.name,
@@ -158,7 +160,7 @@ export async function loadOverview(client: ArgonGraphClient, workspaceId: string
     client.roQuery(
       workspaceId,
       `MATCH (p:Person)-[:AUTHORED]->(pr:PullRequest)-[:TOUCHES]->(:File)-[:IN_COMPONENT]->(c:Component)
-       RETURN p.id AS id, coalesce(p.display_name, p.name, p.id) AS name, c.name AS component,
+       RETURN p.id AS id, coalesce(p.display_name, p.name, p.id) AS name, p.github_login AS login, c.name AS component,
               count(DISTINCT pr) AS prs
        ORDER BY prs DESC LIMIT 500`
     ),
@@ -242,8 +244,13 @@ export async function loadOverview(client: ArgonGraphClient, workspaceId: string
 
   // People: the top author of each component, capped
   const topOwnerByComp = new Map<string, { id: string; name: string; prs: number }>();
+  // GitHub login per person (when known) — a reliable avatar source even when the display name
+  // is a human name ("Jane Doe") that is not a valid GitHub handle.
+  const loginById = new Map<string, string>();
   for (const o of rows(owners)) {
     const comp = str(o.component);
+    const login = str(o.login);
+    if (login) loginById.set(str(o.id), login);
     if (!compNames.has(comp) || topOwnerByComp.has(comp)) continue; // rows are sorted by prs desc
     topOwnerByComp.set(comp, { id: str(o.id), name: str(o.name, str(o.id)), prs: num(o.prs) });
   }
@@ -257,7 +264,8 @@ export async function loadOverview(client: ArgonGraphClient, workspaceId: string
   const nameById = new Map([...topOwnerByComp.values()].map((o) => [o.id, o.name]));
   for (const id of ownerIds) {
     const name = nameById.get(id) ?? id;
-    const avatarUrl = githubAvatarUrl(name);
+    // Prefer the GitHub login for the avatar; fall back to the display name when it is itself a login.
+    const avatarUrl = githubAvatarUrl(loginById.get(id)) ?? githubAvatarUrl(name);
     nodes.push({
       data: {
         id,
@@ -338,5 +346,127 @@ export async function loadOverview(client: ArgonGraphClient, workspaceId: string
         component: r.component == null ? null : str(r.component),
         touches: num(r.touches),
       })),
+  };
+}
+
+// ───────────────────────── File (co-change) graph ─────────────────────────
+
+/** Graph views the canvas can ask the overview endpoint for (`overview` is the default). */
+export const GRAPH_VIEWS = ['overview', 'files'] as const;
+export type GraphView = (typeof GRAPH_VIEWS)[number];
+export const isGraphView = (v: string): v is GraphView => (GRAPH_VIEWS as readonly string[]).includes(v);
+
+export interface FileGraphStats {
+  /** files drawn on the canvas */
+  files: number;
+  /** all files in the workspace */
+  totalFiles: number;
+  /** co-change relationships drawn */
+  edges: number;
+  /** all co-change relationships in the workspace */
+  totalEdges: number;
+  /** true when caps hid part of the graph */
+  truncated: boolean;
+}
+
+export interface FileGraphResponse {
+  workspaceId: string;
+  elements: GraphElements;
+  stats: FileGraphStats;
+}
+
+export const FILE_GRAPH_LIMITS = {
+  /** strongest co-change relationships considered */
+  candidateEdges: 1000,
+  files: 60,
+  edges: 150,
+} as const;
+
+/**
+ * The "Files" view: files that repeatedly change together (`(:File)-[:CO_CHANGES]->(:File)`,
+ * mined at ingest). The strongest relationships are taken first and the files they connect are
+ * shown until the caps are reached, so every drawn file has at least one visible relationship.
+ */
+export async function loadFileGraph(client: ArgonGraphClient, workspaceId: string): Promise<FileGraphResponse> {
+  const [coChanges, totalFiles, totalEdges] = await Promise.all([
+    client.roQuery(
+      workspaceId,
+      `MATCH (a:File)-[r:CO_CHANGES]->(b:File)
+       RETURN a.path AS source, b.path AS target, coalesce(r.weight, 0) AS weight, coalesce(r.count, 0) AS count
+       ORDER BY weight DESC, count DESC, source ASC, target ASC LIMIT ${FILE_GRAPH_LIMITS.candidateEdges}`
+    ),
+    client.roQuery(workspaceId, `MATCH (f:File) RETURN count(f) AS total`),
+    client.roQuery(workspaceId, `MATCH (:File)-[r:CO_CHANGES]->(:File) RETURN count(r) AS total`),
+  ]);
+
+  const candidates = rows(coChanges).filter((r) => str(r.source) && str(r.target) && str(r.source) !== str(r.target));
+  const totalFileCount = num(rows(totalFiles)[0]?.total);
+  const totalEdgeCount = num(rows(totalEdges)[0]?.total);
+
+  // Strongest first; keep an edge only while both of its files fit under the file cap
+  const shownPaths = new Set<string>();
+  const picked: Array<{ source: string; target: string; weight: number; count: number }> = [];
+  for (const r of candidates) {
+    if (picked.length >= FILE_GRAPH_LIMITS.edges) break;
+    const source = str(r.source);
+    const target = str(r.target);
+    const needed = (shownPaths.has(source) ? 0 : 1) + (shownPaths.has(target) ? 0 : 1);
+    if (shownPaths.size + needed > FILE_GRAPH_LIMITS.files) continue;
+    shownPaths.add(source);
+    shownPaths.add(target);
+    picked.push({ source, target, weight: num(r.weight), count: num(r.count) });
+  }
+
+  if (picked.length === 0) {
+    return {
+      workspaceId,
+      elements: { nodes: [], edges: [] },
+      stats: { files: 0, totalFiles: totalFileCount, edges: 0, totalEdges: totalEdgeCount, truncated: false },
+    };
+  }
+
+  const meta = await client.roQuery(
+    workspaceId,
+    `MATCH (f:File) WHERE f.path IN $paths
+     OPTIONAL MATCH (f)-[:IN_COMPONENT]->(c:Component)
+     OPTIONAL MATCH (pr:PullRequest)-[:TOUCHES]->(f)
+     RETURN f.path AS path, c.name AS component, count(DISTINCT pr) AS touches`,
+    { paths: [...shownPaths] }
+  );
+  const metaByPath = new Map(rows(meta).map((r) => [str(r.path), r]));
+
+  const nodes: GraphElements['nodes'] = [...shownPaths].sort().map((path) => {
+    const m = metaByPath.get(path);
+    const component = m?.component == null ? null : str(m.component);
+    const touches = num(m?.touches);
+    return {
+      data: {
+        id: path,
+        label: path,
+        type: 'File',
+        properties: { path, component, touches },
+      },
+    };
+  });
+  const edges: GraphElements['edges'] = picked.map((e) => ({
+    data: {
+      id: `co:${e.source}->${e.target}`,
+      source: e.source,
+      target: e.target,
+      label: 'CO_CHANGES',
+      properties: { weight: e.weight, count: e.count },
+    },
+  }));
+
+  return {
+    workspaceId,
+    elements: { nodes, edges },
+    stats: {
+      files: nodes.length,
+      totalFiles: totalFileCount,
+      edges: edges.length,
+      totalEdges: totalEdgeCount,
+      truncated: edges.length < totalEdgeCount,
+    },
   };
 }

@@ -10,19 +10,28 @@ import { ZoomIn, ZoomOut, Maximize2, RefreshCw, Download, ArrowRightLeft, ArrowU
 import { clsx } from 'clsx';
 import { useGraphSync } from '@/lib/graph-sync';
 import type { LayoutDirection } from '@/lib/graph/model';
+import type { GraphView } from '@/lib/workspace-data';
 
 export interface GraphHudProps {
   direction: LayoutDirection;
   onDirectionChange: (direction: LayoutDirection) => void;
   onRelayout: () => void;
+  /** Which graph is shown; together with `onViewChange` renders the Overview/Files toggle. */
+  view?: GraphView;
+  onViewChange?: (view: GraphView) => void;
   className?: string;
 }
 
 const btn =
   'flex h-8 w-8 items-center justify-center border border-transparent text-white/70 transition-colors hover:border-white hover:bg-white hover:text-black focus-visible:border-white disabled:opacity-40';
 
-/** Floating toolbar: zoom, fit, layout, direction, export, plus the live-sync badge. */
-export function GraphHud({ direction, onDirectionChange, onRelayout, className }: GraphHudProps) {
+const VIEW_OPTIONS: Array<{ value: GraphView; label: string; title: string }> = [
+  { value: 'overview', label: 'Overview', title: 'Components, decisions and owners' },
+  { value: 'files', label: 'Files', title: 'Files that change together' },
+];
+
+/** Floating toolbar: view toggle, zoom, fit, layout, direction, export, plus the live-sync badge. */
+export function GraphHud({ direction, onDirectionChange, onRelayout, view, onViewChange, className }: GraphHudProps) {
   const { zoomIn, zoomOut, fitView, getNodes } = useReactFlow();
   const { syncBadgeText } = useGraphSync();
   const [exporting, setExporting] = useState(false);
@@ -84,7 +93,7 @@ export function GraphHud({ direction, onDirectionChange, onRelayout, className }
       role="toolbar"
       aria-label="Graph controls"
       className={clsx(
-        'absolute bottom-4 right-4 z-30 flex items-center gap-0.5 border border-white/30 bg-black p-0.5 font-mono select-none',
+        'absolute bottom-4 right-4 z-30 flex max-w-[calc(100%-2rem)] flex-wrap items-center justify-end gap-0.5 border border-white/30 bg-black p-0.5 font-mono select-none',
         className
       )}
     >
@@ -97,6 +106,30 @@ export function GraphHud({ direction, onDirectionChange, onRelayout, className }
           >
             <span className="h-1.5 w-1.5 animate-pulse bg-white" />
             <span>{syncBadgeText}</span>
+          </div>
+          <div className="mx-0.5 h-5 w-px bg-white/25" />
+        </>
+      )}
+
+      {view && onViewChange && (
+        <>
+          <div role="group" aria-label="Graph view" data-testid="hud-view-toggle" className="flex">
+            {VIEW_OPTIONS.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                aria-pressed={view === o.value}
+                title={o.title}
+                data-testid={`hud-view-${o.value}`}
+                onClick={() => view !== o.value && onViewChange(o.value)}
+                className={clsx(
+                  'h-8 border border-transparent px-2.5 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors',
+                  view === o.value ? 'bg-white text-black' : 'text-white/70 hover:border-white hover:bg-white hover:text-black'
+                )}
+              >
+                {o.label}
+              </button>
+            ))}
           </div>
           <div className="mx-0.5 h-5 w-px bg-white/25" />
         </>
