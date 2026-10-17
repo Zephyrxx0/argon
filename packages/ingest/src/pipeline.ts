@@ -6,9 +6,29 @@ import { computeCoChangeCoupling } from './coupling/cochange.js';
 import { scanAdrFiles, resolveSupersessions } from './mining/adr.js';
 import { mineReverts } from './mining/reverts.js';
 import { mineCommitDecisions } from './mining/commits.js';
-import { embedDecisions } from './mining/embed.js';
+import { embedDecisionsBestEffort } from './mining/embed.js';
 import { FalkorIngestWriter } from './writer/falkordb.js';
 import { redactSecrets } from './git/redact.js';
+
+/** How often a running job proves it is alive (readers treat a few missed beats as "dead"). */
+export const JOB_HEARTBEAT_INTERVAL_MS = 15_000;
+
+/**
+ * Starts a heartbeat for a running job. Failures are ignored (a missed beat is harmless; the job
+ * itself will surface real database errors). Returns a stop function.
+ */
+export function startJobHeartbeat(
+  writer: Pick<FalkorIngestWriter, 'touchJob'>,
+  jobId: string,
+  intervalMs: number = JOB_HEARTBEAT_INTERVAL_MS
+): () => void {
+  const timer = setInterval(() => {
+    writer.touchJob(jobId).catch(() => {});
+  }, intervalMs);
+  // never keep the process alive just for a heartbeat
+  (timer as { unref?: () => void }).unref?.();
+  return () => clearInterval(timer);
+}
 
 export interface IngestPipelineConfig {
   repoUrl: string;
@@ -51,6 +71,7 @@ export async function runIngestion(config: IngestPipelineConfig): Promise<Ingest
 
   let cloneDir: string | undefined;
   let cleanupFn: (() => Promise<void>) | undefined;
+  let stopHeartbeat: (() => void) | undefined;
 
   try {
     // Stage 1: Initialize Workspace Schema
@@ -58,6 +79,7 @@ export async function runIngestion(config: IngestPipelineConfig): Promise<Ingest
 
     // Stage 2: Queued State (0.0)
     await writer.updateJobStatus(jobId, config.repoUrl, 'queued', 0.0);
+    stopHeartbeat = startJobHeartbeat(writer, jobId);
 
     // Stage 3: Cloning (0.15)
     await writer.updateJobStatus(jobId, config.repoUrl, 'cloning', 0.15);
@@ -87,7 +109,7 @@ export async function runIngestion(config: IngestPipelineConfig): Promise<Ingest
 
     // Stage 7: Decision Indexing & Embedding (0.80)
     await writer.updateJobStatus(jobId, config.repoUrl, 'indexing', 0.80);
-    await embedDecisions(decisions);
+    await embedDecisionsBestEffort(decisions);
 
     // Stage 8: Graph Database Insertion via Parameterized UNWIND Batches
     // 8a. Persons
@@ -170,6 +192,8 @@ export async function runIngestion(config: IngestPipelineConfig): Promise<Ingest
         });
       }
     }
+    await writer.writeGovernsEdges(governsEdges);
+
     // Stage 8d: Identity Linking (:User)-[:IDENTIFIES]->(:Person) (TENANT-02, D-13, D-14, D-15)
     if (config.userId && config.userLogin) {
       await writer.linkUserToMinedPersons(
@@ -199,6 +223,7 @@ export async function runIngestion(config: IngestPipelineConfig): Promise<Ingest
     await writer.updateJobStatus(jobId, config.repoUrl, 'failed', 0.0, redactSecrets(rawError));
     throw error;
   } finally {
+    stopHeartbeat?.();
     if (cleanupFn) {
       await cleanupFn();
     }

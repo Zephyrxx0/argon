@@ -3,6 +3,15 @@ import * as queries from './queries.js';
 import { redactSecrets } from '../git/redact.js';
 import { hashAuthorEmail } from '../git/author.js';
 
+function dropUndefined<T>(item: T): T {
+  if (item === null || typeof item !== 'object' || Array.isArray(item)) return item;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(item as Record<string, unknown>)) {
+    if (value !== undefined) out[key] = value;
+  }
+  return out as T;
+}
+
 export class FalkorIngestWriter {
   constructor(
     private readonly client: ArgonGraphClient,
@@ -33,6 +42,17 @@ export class FalkorIngestWriter {
   }
 
   /**
+   * Heartbeat: bumps `updated_at` of a still-running job so readers can tell a slow job from a
+   * dead one. Never resurrects a job that already finished.
+   */
+  async touchJob(jobId: string): Promise<void> {
+    await this.client.query(this.workspaceId, queries.TOUCH_JOB, {
+      jobId,
+      updatedAt: Math.floor(Date.now() / 1000),
+    });
+  }
+
+  /**
    * Executes a parameterized Cypher write in chunked batches (default 500 items).
    */
   async writeBatch<T>(query: string, items: T[], batchSize = 500): Promise<void> {
@@ -41,7 +61,9 @@ export class FalkorIngestWriter {
     }
 
     for (let i = 0; i < items.length; i += batchSize) {
-      const batch = items.slice(i, i + batchSize);
+      // The FalkorDB client refuses `undefined` values (e.g. a decision whose embedding could not
+      // be computed); drop those keys so they read as null/absent in Cypher.
+      const batch = items.slice(i, i + batchSize).map(dropUndefined);
       await this.client.query(this.workspaceId, query, { batch });
     }
   }

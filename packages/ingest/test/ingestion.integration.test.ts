@@ -98,6 +98,16 @@ describe('ingestion pipeline integration', () => {
       expect(s.d2_status).toBe('accepted');
       expect(s.d1_valid_to).toBe(s.d2_valid_from);
 
+      // 6b. Every mined decision must govern a component (briefings' constraining-decisions query joins on this)
+      const governsResult = await client.roQuery(
+        workspaceId,
+        `MATCH (d:Decision) OPTIONAL MATCH (d)-[g:GOVERNS]->(:Component)
+         RETURN count(DISTINCT d) AS decisions, count(DISTINCT CASE WHEN g IS NOT NULL THEN d END) AS governing`
+      );
+      const gov = (governsResult.data as any)[0];
+      expect(Number(gov.decisions)).toBeGreaterThan(0);
+      expect(Number(gov.governing)).toBe(Number(gov.decisions));
+
       // 7. Verify Decision Vector Index & Embeddings
       const embedResult = await client.roQuery(
         workspaceId,

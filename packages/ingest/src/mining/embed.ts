@@ -29,3 +29,23 @@ export async function embedDecisions(
 
   return decisions;
 }
+
+/**
+ * Embeds decisions but never lets an embedding problem (model download interrupted, no
+ * network, provider quota...) abort the whole ingestion: the graph is still fully usable for
+ * ownership, blast radius and file/component briefings; only vector precedent search for
+ * these decisions is unavailable. Returns whether vectors were produced.
+ */
+export async function embedDecisionsBestEffort(
+  decisions: MinedDecision[],
+  embed: (d: MinedDecision[]) => Promise<MinedDecision[]> = embedDecisions
+): Promise<{ embedded: boolean; error?: string }> {
+  try {
+    await embed(decisions);
+    return { embedded: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[ingest] Decision embedding failed; continuing without vectors: ${message}`);
+    return { embedded: false, error: message };
+  }
+}

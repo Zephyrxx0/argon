@@ -13,6 +13,12 @@ SET j.repo_url = $repoUrl,
     j.started_at = coalesce(j.started_at, $startedAt)
 `;
 
+export const TOUCH_JOB = `
+MATCH (j:IngestJob {id: $jobId})
+WHERE j.status <> 'completed' AND j.status <> 'failed'
+SET j.updated_at = $updatedAt
+`;
+
 export const BATCH_MERGE_PERSONS = `
 UNWIND $batch AS row
 MERGE (p:Person {id: row.id})
