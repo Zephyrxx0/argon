@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Loader2, AlertCircle, CornerDownLeft } from 'lucide-react';
 import { CommandDialog } from './command-dialog';
+import type { WorkspaceSuggestions } from '@/lib/scenarios';
 import { clsx } from 'clsx';
 
 export interface CommandBarProps {
@@ -10,7 +11,20 @@ export interface CommandBarProps {
   isLoading?: boolean;
   error?: string | null;
   onSubmit: (query: string) => void;
+  /** Palette suggestions for the active workspace. */
+  suggestions?: WorkspaceSuggestions;
   className?: string;
+}
+
+const DEFAULT_PLACEHOLDER = 'Search scope (e.g. billing/retry.ts, auth, why does legacy-sync exist?)...';
+
+/** Example text drawn from the active workspace so it never suggests files that are not there. */
+export function placeholderFor(suggestions?: WorkspaceSuggestions): string {
+  if (!suggestions || suggestions.curated) return DEFAULT_PLACEHOLDER;
+  const examples = suggestions.entities.slice(0, 2).map((e) => e.query);
+  return examples.length > 0
+    ? `Search scope (e.g. ${examples.join(', ')})...`
+    : 'Search scope: a file path, a component name, or a question...';
 }
 
 export function CommandBar({
@@ -18,6 +32,7 @@ export function CommandBar({
   isLoading = false,
   error = null,
   onSubmit,
+  suggestions,
   className,
 }: CommandBarProps) {
   const [query, setQuery] = useState(value);
@@ -66,7 +81,7 @@ export function CommandBar({
           className={clsx(
             'flex items-center w-full px-3 py-1.5 border transition-all duration-150',
             isLoading
-              ? 'border-accent shadow-[0_0_12px_rgba(0,240,255,0.3)] bg-accent/5'
+              ? 'border-accent bg-accent/5'
               : error
               ? 'border-danger bg-danger/5'
               : 'border-border bg-muted/60 hover:border-border/80 focus-within:border-accent focus-within:bg-card'
@@ -93,7 +108,7 @@ export function CommandBar({
             placeholder={
               isLoading
                 ? 'COMPUTING SCOPE EMBEDDING...'
-                : 'Search scope (e.g. billing/retry.ts, auth, why does legacy-sync exist?)...'
+                : placeholderFor(suggestions)
             }
             data-testid="command-bar-input"
             className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none font-mono tracking-tight"
@@ -145,6 +160,9 @@ export function CommandBar({
         open={isPaletteOpen}
         onOpenChange={setIsPaletteOpen}
         onSelectQuery={handlePaletteSelect}
+        scenarios={suggestions?.scenarios}
+        entities={suggestions?.entities}
+        curated={suggestions?.curated}
       />
     </>
   );

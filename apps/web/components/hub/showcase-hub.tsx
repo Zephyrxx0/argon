@@ -4,52 +4,31 @@ import React from 'react';
 import { Sparkles, ArrowRight, ShieldAlert, GitFork, BookOpen, Layers } from 'lucide-react';
 import { clsx } from 'clsx';
 
-export interface ScenarioPreset {
-  id: string;
-  badge: string;
-  title: string;
-  query: string;
-  description: string;
-  iconName: 'git-fork' | 'layers' | 'book-open';
-  accentColor: string;
-}
+import { SCENARIO_PRESETS, type ScenarioPreset } from '@/lib/scenarios';
 
-export const SCENARIO_PRESETS: ScenarioPreset[] = [
-  {
-    id: 's1-blast-radius',
-    badge: 'BLAST RADIUS & OWNERS',
-    title: 'Refactor `billing/retry.ts`',
-    query: 'Refactor billing/retry.ts',
-    description: 'Analyze file blast radius, co-change coupling, and key component owners.',
-    iconName: 'git-fork',
-    accentColor: 'text-accent border-accent/40',
-  },
-  {
-    id: 's2-onboarding-path',
-    badge: 'ONBOARDING PATH',
-    title: 'I want to work on the auth layer',
-    query: 'I want to work on the auth layer',
-    description: 'Compute learning path from familiar components to auth decisions and experts.',
-    iconName: 'layers',
-    accentColor: 'text-warning border-warning/40',
-  },
-  {
-    id: 's3-architectural-precedent',
-    badge: 'ARCHITECTURAL PRECEDENT',
-    title: 'Why does `legacy-sync` exist?',
-    query: 'Why does legacy-sync exist?',
-    description: 'Trace the governing decisions, RFCs, and supersession timeline.',
-    iconName: 'book-open',
-    accentColor: 'text-accent border-accent/40',
-  },
-];
+export { SCENARIO_PRESETS };
+export type { ScenarioPreset };
 
 export interface ShowcaseHubProps {
   onSelectScenario?: (query: string, scenarioId?: string) => void;
+  /** Scenarios for the active workspace. Defaults to the curated demo trio. */
+  scenarios?: ScenarioPreset[];
+  /** `curated` = hand-written for this workspace; otherwise derived from its graph. */
+  curated?: boolean;
+  workspaceId?: string;
+  /** While the workspace graph is still being read there is nothing to suggest yet. */
+  loading?: boolean;
   className?: string;
 }
 
-export function ShowcaseHub({ onSelectScenario, className }: ShowcaseHubProps) {
+export function ShowcaseHub({
+  onSelectScenario,
+  scenarios = SCENARIO_PRESETS,
+  curated = true,
+  workspaceId,
+  loading = false,
+  className,
+}: ShowcaseHubProps) {
   const getIcon = (name: ScenarioPreset['iconName']) => {
     switch (name) {
       case 'git-fork':
@@ -82,18 +61,30 @@ export function ShowcaseHub({ onSelectScenario, className }: ShowcaseHubProps) {
       {/* Preset Scenario Cards Grid */}
       <div className="space-y-3">
         <div className="flex items-center justify-between text-xs text-muted-foreground uppercase tracking-widest font-semibold">
-          <span>CURATED SHOWCASE SCENARIOS</span>
-          <span>3 PRE-INDEXED WORKSPACES</span>
+          <span>{curated ? 'CURATED SHOWCASE SCENARIOS' : 'SUGGESTED FOR THIS WORKSPACE'}</span>
+          {workspaceId && <span className="truncate max-w-[50%]">{workspaceId}</span>}
         </div>
 
+        {loading && (
+          <p data-testid="scenarios-loading" className="text-xs text-muted-foreground">
+            Reading this workspace&rsquo;s graph for suggestions&hellip;
+          </p>
+        )}
+        {!loading && scenarios.length === 0 && (
+          <p data-testid="scenarios-empty" className="text-xs text-muted-foreground">
+            Nothing to suggest yet: no components or files are indexed for this workspace. Type a file or component
+            name in the command bar.
+          </p>
+        )}
+
         <div className="grid grid-cols-1 gap-4">
-          {SCENARIO_PRESETS.map((scenario) => (
+          {scenarios.map((scenario) => (
             <button
               key={scenario.id}
               type="button"
               onClick={() => onSelectScenario?.(scenario.query, scenario.id)}
               data-testid={`scenario-card-${scenario.id}`}
-              className="group text-left border border-border bg-card p-4 sm:p-5 transition-all hover:border-accent hover:shadow-[0_0_15px_rgba(0,240,255,0.15)] flex flex-col justify-between"
+              className="group text-left border border-border bg-card p-4 sm:p-5 transition-all hover:border-accent flex flex-col justify-between"
             >
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
