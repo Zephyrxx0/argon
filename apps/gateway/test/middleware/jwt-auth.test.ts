@@ -182,3 +182,40 @@ describe('Gateway JWT Middleware', () => {
     expect(body.error).toContain('Token missing subject claim');
   });
 });
+
+describe('jwtAuthMiddleware with distinct GATEWAY_SECRET and BETTER_AUTH_SECRET', () => {
+  it('accepts session JWTs signed with BETTER_AUTH_SECRET even when the gateway secret differs', async () => {
+    const { sign } = await import('hono/jwt');
+    const { Hono } = await import('hono');
+    const { jwtAuthMiddleware } = await import('../../src/middleware/jwt.js');
+
+    const prev = process.env.BETTER_AUTH_SECRET;
+    process.env.BETTER_AUTH_SECRET = 'better-auth-secret-0123456789abcdef';
+    try {
+      const app = new Hono();
+      app.use('/api/*', jwtAuthMiddleware('gateway-static-secret-fedcba9876543210'));
+      app.get('/api/ping', (c) => c.json({ user: c.get('user' as never) }));
+
+      const exp = Math.floor(Date.now() / 1000) + 600;
+      const good = await sign({ userId: 'u1', isAnonymous: true, exp }, process.env.BETTER_AUTH_SECRET!, 'HS256');
+      const forged = await sign({ userId: 'u1', exp }, 'some-other-secret', 'HS256');
+
+      const ok = await app.request('/api/ping', { headers: { Authorization: `Bearer ${good}` } });
+      expect(ok.status).toBe(200);
+      expect(((await ok.json()) as any).user.userId).toBe('u1');
+
+      expect((await app.request('/api/ping', { headers: { Authorization: `Bearer ${forged}` } })).status).toBe(401);
+      // BETTER_AUTH_SECRET itself must NOT work as a static admin bearer token
+      expect(
+        (await app.request('/api/ping', { headers: { Authorization: `Bearer ${process.env.BETTER_AUTH_SECRET}` } })).status
+      ).toBe(401);
+      // the static gateway secret still does
+      expect(
+        (await app.request('/api/ping', { headers: { Authorization: 'Bearer gateway-static-secret-fedcba9876543210' } })).status
+      ).toBe(200);
+    } finally {
+      if (prev === undefined) delete process.env.BETTER_AUTH_SECRET;
+      else process.env.BETTER_AUTH_SECRET = prev;
+    }
+  });
+});

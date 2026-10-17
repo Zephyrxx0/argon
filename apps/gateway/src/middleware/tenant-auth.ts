@@ -9,10 +9,10 @@ import { ErrorCodes, type GatewayErrorResponse, type JwtAuthUser } from '../type
  */
 export function tenantAuthMiddleware(graphClient: ArgonGraphClient): MiddlewareHandler {
   return async (c, next) => {
+    // Derive from the path: the generic `/api/v1/:workspaceId/*` guard also matches
+    // `/api/v1/workspaces/<id>/...`, where the route param would be the literal "workspaces".
     const parts = c.req.path.split('/');
-    const workspaceId =
-      c.req.param('workspaceId') ||
-      (parts[3] === 'workspaces' ? parts[4] : parts[3]);
+    const workspaceId = parts[3] === 'workspaces' ? parts[4] : parts[3];
 
     if (!workspaceId) {
       return await next();
@@ -59,6 +59,15 @@ export function tenantAuthMiddleware(graphClient: ArgonGraphClient): MiddlewareH
           code: ErrorCodes.FALKORDB_UNREACHABLE,
         };
         return c.json(errorResponse, 503);
+      }
+
+      // FalkorDB raises this when the per-workspace graph key does not exist
+      if (err?.message?.includes('empty key')) {
+        const errorResponse: GatewayErrorResponse = {
+          error: `Workspace '${workspaceId}' not found`,
+          code: ErrorCodes.NOT_FOUND,
+        };
+        return c.json(errorResponse, 404);
       }
 
       const errorResponse: GatewayErrorResponse = {

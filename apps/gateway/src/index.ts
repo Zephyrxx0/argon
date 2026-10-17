@@ -1,9 +1,21 @@
 import { serve } from '@hono/node-server';
 import { ArgonGraphClient } from '@argon/graph';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import { createGatewayApp } from './app.js';
 
+// Load the shared repo-root .env (works from src/ under tsx and from dist/ after build),
+// then fall back to a package-local .env. Existing process env vars always win.
+const here = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(here, '../../../.env') });
 dotenv.config();
+
+// A failure inside a background job (e.g. an ingestion's model download) must never take the
+// whole gateway down with it: log it and keep serving.
+process.on('unhandledRejection', (reason) => {
+  console.error('[Gateway] Unhandled promise rejection (kept alive):', reason);
+});
 
 const port = Number(process.env.PORT ?? 8080);
 const graphClient = new ArgonGraphClient();

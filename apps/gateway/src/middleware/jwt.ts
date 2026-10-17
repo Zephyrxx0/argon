@@ -8,6 +8,13 @@ export function jwtAuthMiddleware(secretOverride?: string): MiddlewareHandler {
   return async (c, next) => {
     const secret = secretOverride ?? process.env.BETTER_AUTH_SECRET ?? process.env.GATEWAY_SECRET;
 
+    // Session JWTs are issued by the web app with BETTER_AUTH_SECRET, while the gateway is
+    // typically configured with a distinct GATEWAY_SECRET (static server-to-server token).
+    // JWTs must verify against either; only `secret` is accepted as the static admin token.
+    const jwtSecrets = [
+      ...new Set([secret, process.env.BETTER_AUTH_SECRET].filter((v): v is string => Boolean(v?.trim()))),
+    ];
+
     if (c.req.path.startsWith('/api/v1/webhooks')) {
       return await next();
     }
@@ -45,7 +52,17 @@ export function jwtAuthMiddleware(secretOverride?: string): MiddlewareHandler {
     }
 
     try {
-      const payload = (await verify(token, secret, 'HS256')) as Record<string, unknown>;
+      let payload: Record<string, unknown> | undefined;
+      let lastError: unknown;
+      for (const key of jwtSecrets) {
+        try {
+          payload = (await verify(token, key, 'HS256')) as Record<string, unknown>;
+          break;
+        } catch (verifyErr) {
+          lastError = verifyErr;
+        }
+      }
+      if (!payload) throw lastError;
       const userId = String(payload.userId ?? payload.sub ?? '');
       const isAnonymous = Boolean(payload.isAnonymous);
 

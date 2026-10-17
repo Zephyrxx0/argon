@@ -165,4 +165,30 @@ describe('Gateway Tenant Authorization Guard', () => {
     expect(body.code).toBe('FORBIDDEN');
     expect(body.error).toBe('Workspace access denied');
   });
+
+  it('guards /api/v1/workspaces/:id/events by the real workspace id, not the literal "workspaces"', async () => {
+    const mockClient = setupMockClient();
+    const app = createGatewayApp({
+      graphClient: mockClient,
+      gatewaySecret: SECRET,
+      eventsOptions: { heartbeatIntervalMs: 60_000 },
+    });
+    const token = await makeJwt({ userId: 'usr_stranger', isAnonymous: false });
+    const headers = { Authorization: `Bearer ${token}` };
+
+    const ok = await app.request('/api/v1/workspaces/public-showcase/events', { headers });
+    expect(ok.status).toBe(200);
+    expect(ok.headers.get('content-type')).toContain('text/event-stream');
+    await ok.body?.cancel();
+
+    const denied = await app.request('/api/v1/workspaces/private-repo/events', { headers });
+    expect(denied.status).toBe(403);
+
+    const missing = await app.request('/api/v1/workspaces/missing-workspace/events', { headers });
+    expect(missing.status).toBe(404);
+
+    // the tenant guard must never have been asked about a graph literally named "workspaces"
+    const asked = (mockClient.roQuery as any).mock.calls.map((c: any[]) => c[0]);
+    expect(asked).not.toContain('workspaces');
+  });
 });
