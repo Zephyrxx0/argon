@@ -1,6 +1,7 @@
 import { ArgonGraphClient } from '@argon/graph';
 import { DirectGraphGatewayClient, runBriefingPipeline } from '@argon/agent';
 import picocolors from 'picocolors';
+import { connectInProcess } from '../apps/mcp/src/inprocess.js';
 
 export async function runDemoCheck(options: { allowMockFallback?: boolean } = {}) {
   console.log(picocolors.bold(picocolors.cyan('=== ARGON DEMO SMOKE TEST ===\n')));
@@ -121,6 +122,55 @@ export async function runDemoCheck(options: { allowMockFallback?: boolean } = {}
     process.exit(1);
   }
   console.log(picocolors.green('OK (Briefing generated)'));
+
+  // Step 3b: graph-derived verdict + tool trace (Track 1: explainable, graph-driven action)
+  process.stdout.write('3b. Verifying graph verdict and tool trace... ');
+  const pipelineCalls = (briefingResponse.toolTrace ?? []).filter(
+    (t) => t.source === 'pipeline' && t.status === 'ok'
+  );
+  if (!briefingResponse.verdict || pipelineCalls.length < 6) {
+    console.log(
+      picocolors.red(
+        `FAILED (verdict=${briefingResponse.verdict?.level ?? 'missing'}, ok pipeline calls=${pipelineCalls.length}/6)`
+      )
+    );
+    process.exit(1);
+  }
+  console.log(
+    picocolors.green(
+      `OK (verdict ${briefingResponse.verdict.level}: ${briefingResponse.verdict.reasons
+        .filter((r) => r.severity !== 'info')
+        .map((r) => r.rule)
+        .join(', ') || 'no risk signals'}; ${briefingResponse.toolTrace!.length} graph tool calls)`
+    )
+  );
+
+  // Step 3c: the same tools over MCP (Track 1: tool selection through MCP)
+  process.stdout.write('3c. Calling graph tools over MCP (in-process client)... ');
+  const mcp = await connectInProcess({ client: gateway, graphClient: client, defaultWorkspaceId: 'synthetic-demo' });
+  try {
+    const tools = (await mcp.client.listTools()).tools;
+    const reverts: any = await mcp.client.callTool({
+      name: 'revert_history',
+      arguments: { files: ['src/billing/retry.ts'] },
+    });
+    const risk: any = await mcp.client.callTool({ name: 'risk_ranking', arguments: { limit: 3 } });
+    if (tools.length < 12 || reverts.isError || risk.isError || (reverts.structuredContent?.rowCount ?? 0) < 1) {
+      console.log(
+        picocolors.red(
+          `FAILED (tools=${tools.length}, revert rows=${reverts.structuredContent?.rowCount ?? 'n/a'}, risk error=${Boolean(risk.isError)})`
+        )
+      );
+      process.exit(1);
+    }
+    console.log(
+      picocolors.green(
+        `OK (${tools.length} MCP tools; revert_history -> ${reverts.structuredContent.rowCount} revert(s) on billing/retry.ts)`
+      )
+    );
+  } finally {
+    await mcp.close();
+  }
 
   // Step 4: Citation Integrity Check
   process.stdout.write('4. Verifying 100% citation integrity... ');

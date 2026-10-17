@@ -162,12 +162,12 @@ The results across all 24 cases were measured using standard Information Retriev
 +---------------------------+------------------+-------------------+--------------------+
 | Metric                    | Naive Vector RAG | Raw LLM (Gemma 4) | Argon (FalkorDB)   |
 +---------------------------+------------------+-------------------+--------------------+
-| Recall@1                  | 4.2%             | 16.7%             | 83.3%  (+79.2%)    |
+| Recall@1                  | 4.2%             | 16.7%             | 62.5%  (+58.3%)    |
 | Recall@3                  | 8.3%             | 33.3%             | 95.8%  (+87.5%)    |
-| Recall@5                  | 29.2%            | 41.7%             | 95.8%  (+66.7%)    |
-| Mean Reciprocal Rank (MRR)| 0.162            | 0.257             | 0.889  (+0.727)    |
+| Recall@5                  | 29.2%            | 41.7%             | 100.0% (+70.8%)    |
+| Mean Reciprocal Rank (MRR)| 0.162            | 0.257             | 0.788  (+0.626)    |
 | Superseded Hallucinations | 12.5%            | 54.2%             | 0.0% (Clean!)      |
-| Average Query Latency     | 120ms            | 0ms (cached)      | 6ms                |
+| Average Query Latency     | 123ms            | 0ms (cached)      | 2ms                |
 +---------------------------+------------------+-------------------+--------------------+
 ```
 
@@ -178,11 +178,11 @@ xychart-beta
     y-axis "Percentage" 0 --> 100
     bar [4.2, 8.3, 29.2]
     bar [16.7, 33.3, 41.7]
-    bar [83.3, 95.8, 95.8]
+    bar [62.5, 95.8, 100.0]
 ```
 
 ### Analysis of the Delta
-- **Recall@1 jumped from 4.2% to 83.3% (+79.2% absolute gain)**. Vector search fails at rank 1 because semantic similarity scores are dominated by keyword frequency ("retry", "client", "request") rather than architectural relevance.
+- **Recall@3 reached 95.8% (vs 8.3% for vector RAG) and Recall@1 is 62.5% (+58.3% absolute)**. Vector search fails because semantic similarity scores are dominated by keyword frequency ("retry", "client", "request") rather than architectural relevance. Argon's Recall@1 is held below its Recall@3 by fixtures whose component has two decisions in force at once (the query returns both; the intended one is sometimes at rank 2) — a benchmark modelling limit, not a retrieval miss.
 - **Superseded Hallucinations dropped from 54.2% to 0.0%**. In the Raw LLM baseline, more than half of the responses recommended an obsolete architectural pattern because the LLM could not parse the chronological validity across a large catalog. In FalkorDB, the Cypher predicate guarantees zero superseded decision leakage.
 
 ---
@@ -283,7 +283,7 @@ All computed inside FalkorDB in under **10 milliseconds**.
 
 Building Argon for the FalkorDB Hackathon 2026 yielded several critical insights for engineers designing agentic graph systems:
 
-1. **Keep Computation in the Database**: In initial prototypes, we attempted to rank components in TypeScript after fetching raw edge lists. This was slow and brittle. Moving PageRank (`algo.PageRank`) and label propagation (`algo.CDLP`) directly into openCypher reduced latency by 90% and eliminated thousands of lines of client-side code.
+1. **Keep Computation in the Database**: In initial prototypes, we attempted to rank components in TypeScript after fetching raw edge lists. This was slow and brittle. Moving PageRank (`algo.pageRank`) and shortest-path search (`algo.SPpaths`) directly into openCypher reduced latency by 90% and eliminated thousands of lines of client-side code.
 2. **Matryoshka Embeddings on CPU are Production-Ready**: By utilizing EmbeddingGemma-2 truncated to 512 dimensions (`q8` ONNX via Transformers.js), we generated high-quality embeddings on consumer Node.js CPU in 25ms per item without external GPU or paid API dependencies.
 3. **Write-Back Memory Completes the Agent Loop**: By saving each generated briefing as a `(:Briefing)` node connected via `[:CITES]` to the decisions it referenced, subsequent queries can detect when multiple developers are asking about the same high-risk component, creating emergent organizational memory.
 
