@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@argon/graph": "workspace:*",
+    "@octokit/rest": "22.0.1",
     "simple-git": "^3.27.0",
     "zod": "^3.24.2"
   },

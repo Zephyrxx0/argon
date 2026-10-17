@@ -53,7 +53,9 @@ SET d.title = row.title,
     d.source_url = row.source_url,
     d.source_kind = row.source_kind,
     d.summary = row.summary,
-    d.embedding = row.embedding,
+    // Only vecf32 values enter FalkorDB's vector index; a plain list property is invisible to
+    // db.idx.vector.queryNodes, which made precedent search return nothing on ingested repos.
+    d.embedding = CASE WHEN row.embedding IS NULL THEN NULL ELSE vecf32(row.embedding) END,
     d.embedding_model = 'embeddinggemma-2'
 `;
 
@@ -87,6 +89,15 @@ SET r.weight = row.weight,
     r.count = row.count
 `;
 
+export const BATCH_EDGES_CO_CHANGES = `
+UNWIND $batch AS row
+MATCH (f1:File {path: row.source})
+MATCH (f2:File {path: row.target})
+MERGE (f1)-[r:CO_CHANGES]->(f2)
+SET r.weight = row.weight,
+    r.count = row.count
+`;
+
 export const BATCH_EDGES_REVERTS = `
 UNWIND $batch AS row
 MATCH (pr1:PullRequest {id: row.revert_id})
@@ -108,6 +119,160 @@ MATCH (c:Component {name: row.component_name})
 MERGE (d)-[:GOVERNS]->(c)
 `;
 
+// ---------------------------------------------------------------------------
+// Company Brain: provenance, GitHub pull requests / reviews / issues, ownership
+// ---------------------------------------------------------------------------
+
+/** (Decision)-[:EXTRACTED_FROM]->(PullRequest): where a decision was found. */
+export const BATCH_EDGES_EXTRACTED_FROM = `
+UNWIND $batch AS row
+MATCH (d:Decision {id: row.decision_id})
+MATCH (pr:PullRequest {id: row.pr_id})
+MERGE (d)-[:EXTRACTED_FROM]->(pr)
+`;
+
+/** GitHub metadata for a PullRequest node that already exists (a mined merge commit). */
+export const BATCH_UPDATE_PULL_REQUESTS = `
+UNWIND $batch AS row
+MATCH (pr:PullRequest {id: row.id})
+SET pr.number = row.number,
+    pr.url = row.url,
+    pr.state = row.state,
+    pr.body_excerpt = row.body_excerpt,
+    pr.github_title = row.title
+`;
+
+/** A merged GitHub PR whose merge commit is outside the mined history. */
+export const BATCH_MERGE_PLACEHOLDER_PULL_REQUESTS = `
+UNWIND $batch AS row
+MERGE (pr:PullRequest {id: row.id})
+SET pr.number = row.number,
+    pr.title = row.title,
+    pr.url = row.url,
+    pr.state = row.state,
+    pr.body_excerpt = row.body_excerpt,
+    pr.merged_at = row.merged_at,
+    pr.is_revert = row.is_revert
+`;
+
+/** Placeholders superseded by a commit node (frees the unique PullRequest.number). */
+export const RETIRE_PLACEHOLDER_PULL_REQUESTS = `
+MATCH (pr:PullRequest)
+WHERE pr.id IN $ids AND pr.id STARTS WITH 'pr_gh_'
+DETACH DELETE pr
+`;
+
+/** GitHub accounts that could not be matched to a git author. */
+export const BATCH_MERGE_GITHUB_PERSONS = `
+UNWIND $batch AS row
+MERGE (p:Person {id: row.id})
+ON CREATE SET p.name = row.login, p.display_name = row.login
+SET p.github_login = row.login
+`;
+
+/** Records the GitHub login of a person known from git history. */
+export const BATCH_SET_PERSON_LOGIN = `
+UNWIND $batch AS row
+MATCH (p:Person {id: row.id})
+SET p.github_login = row.login
+`;
+
+export const BATCH_EDGES_REVIEWED = `
+UNWIND $batch AS row
+MATCH (p:Person {id: row.reviewer_id})
+MATCH (pr:PullRequest {id: row.pr_id})
+MERGE (p)-[r:REVIEWED]->(pr)
+SET r.state = row.state,
+    r.count = row.count,
+    r.last_at = row.last_at
+`;
+
+export const BATCH_MERGE_ISSUES = `
+UNWIND $batch AS row
+MERGE (i:Issue {id: row.id})
+SET i.number = row.number,
+    i.title = row.title,
+    i.state = row.state,
+    i.url = row.url,
+    i.created_at = row.created_at
+`;
+
+export const BATCH_EDGES_CLOSES = `
+UNWIND $batch AS row
+MATCH (pr:PullRequest {id: row.pr_id})
+MATCH (i:Issue {id: row.issue_id})
+MERGE (pr)-[:CLOSES]->(i)
+`;
+
+/** (Issue)-[:AFFECTS]->(Component), derived through the files of the PRs that close the issue. */
+export const BATCH_DERIVE_ISSUE_AFFECTS = `
+UNWIND $ids AS issueId
+MATCH (i:Issue {id: issueId})<-[:CLOSES]-(pr:PullRequest)-[:TOUCHES]->(f:File)-[:IN_COMPONENT]->(c:Component)
+WITH i, c, count(DISTINCT f) AS files
+MERGE (i)-[r:AFFECTS]->(c)
+SET r.files = files
+`;
+
+export const READ_PULL_REQUEST_IDS_BY_NUMBER = `
+MATCH (pr:PullRequest)
+WHERE pr.number IN $numbers
+RETURN pr.number AS number, pr.id AS id
+`;
+
+export const READ_EXISTING_PULL_REQUEST_IDS = `
+MATCH (pr:PullRequest)
+WHERE pr.id IN $ids
+RETURN pr.id AS id
+`;
+
+export const READ_EXISTING_DECISIONS = `
+MATCH (d:Decision)
+WHERE d.id IN $ids
+RETURN d.id AS id, d.status AS status
+`;
+
+export const READ_EXISTING_FILES = `
+MATCH (f:File)
+WHERE f.path IN $paths
+RETURN f.path AS path
+`;
+
+/** Ownership is replaced on every ingest, so a removed CODEOWNERS rule does not linger. */
+export const DELETE_COMPONENT_OWNERSHIP = `
+MATCH ()-[r:OWNS]->(:Component)
+DELETE r
+`;
+
+export const BATCH_MERGE_TEAMS = `
+UNWIND $batch AS row
+MERGE (t:Team {id: row.id})
+SET t.name = row.name
+`;
+
+export const BATCH_EDGES_OWNS_PERSON = `
+UNWIND $batch AS row
+MATCH (o:Person {id: row.owner_id})
+MATCH (c:Component {name: row.component_name})
+MERGE (o)-[r:OWNS]->(c)
+SET r.pattern = row.pattern,
+    r.coverage = row.coverage
+`;
+
+export const BATCH_EDGES_OWNS_TEAM = `
+UNWIND $batch AS row
+MATCH (o:Team {id: row.owner_id})
+MATCH (c:Component {name: row.component_name})
+MERGE (o)-[r:OWNS]->(c)
+SET r.pattern = row.pattern,
+    r.coverage = row.coverage
+`;
+
+export const SET_JOB_GITHUB_STATUS = `
+MATCH (j:IngestJob {id: $jobId})
+SET j.github_status = $status,
+    j.github_note = $note
+`;
+
 export const LINK_USER_TO_PERSONS_QUERY = `
 MERGE (u:User {id: $userId})
 ON CREATE SET u.login = $userLogin
@@ -121,6 +286,7 @@ WHERE (p.email IS NOT NULL AND p.email IN $userEmails)
    OR (p.email IS NOT NULL AND p.email = ($userLogin + '@users.noreply.github.com'))
    OR toLower(p.name) = toLower($userLogin)
    OR toLower(coalesce(p.display_name, '')) = toLower($userLogin)
+   OR toLower(coalesce(p.github_login, '')) = toLower($userLogin)
 MERGE (u)-[r:IDENTIFIES]->(p)
 ON CREATE SET r.created_at = timestamp()
 RETURN count(r) AS linked_count

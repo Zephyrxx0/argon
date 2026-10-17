@@ -130,6 +130,13 @@ describe('FalkorIngestWriter Unit Suite', () => {
       batch: [{ source: 'packages/core', target: 'packages/utils', weight: 0.8, count: 5 }],
     });
 
+    await writer.writeCoChangesEdges([
+      { source: 'src/a.ts', target: 'src/b.ts', weight: 0.5, count: 4 },
+    ]);
+    expect(mockClient.query).toHaveBeenLastCalledWith(workspaceId, queries.BATCH_EDGES_CO_CHANGES, {
+      batch: [{ source: 'src/a.ts', target: 'src/b.ts', weight: 0.5, count: 4 }],
+    });
+
     await writer.writeRevertsEdges([{ revert_id: 'pr_2', reverted_id: 'pr_1' }]);
     expect(mockClient.query).toHaveBeenLastCalledWith(workspaceId, queries.BATCH_EDGES_REVERTS, {
       batch: [{ revert_id: 'pr_2', reverted_id: 'pr_1' }],

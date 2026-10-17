@@ -12,6 +12,17 @@ function dropUndefined<T>(item: T): T {
   return out as T;
 }
 
+export interface PullRequestMetadata {
+  id: string;
+  number: number;
+  title: string;
+  url: string;
+  state: string;
+  body_excerpt: string;
+  merged_at?: number;
+  is_revert?: boolean;
+}
+
 export class FalkorIngestWriter {
   constructor(
     private readonly client: ArgonGraphClient,
@@ -121,6 +132,13 @@ export class FalkorIngestWriter {
     await this.writeBatch(queries.BATCH_EDGES_DEPENDS_ON, edges);
   }
 
+  /** (File)-[:CO_CHANGES {weight, count}]->(File): files that repeatedly change in the same commit. */
+  async writeCoChangesEdges(
+    edges: { source: string; target: string; weight: number; count: number }[]
+  ): Promise<void> {
+    await this.writeBatch(queries.BATCH_EDGES_CO_CHANGES, edges);
+  }
+
   async writeRevertsEdges(edges: { revert_id: string; reverted_id: string }[]): Promise<void> {
     await this.writeBatch(queries.BATCH_EDGES_REVERTS, edges);
   }
@@ -131,6 +149,111 @@ export class FalkorIngestWriter {
 
   async writeGovernsEdges(edges: { decision_id: string; component_name: string }[]): Promise<void> {
     await this.writeBatch(queries.BATCH_EDGES_GOVERNS, edges);
+  }
+
+  // ---- Company Brain ----
+
+  async writeExtractedFromEdges(edges: { decision_id: string; pr_id: string }[]): Promise<void> {
+    await this.writeBatch(queries.BATCH_EDGES_EXTRACTED_FROM, edges);
+  }
+
+  async updatePullRequests(rows: PullRequestMetadata[]): Promise<void> {
+    await this.writeBatch(queries.BATCH_UPDATE_PULL_REQUESTS, rows);
+  }
+
+  async mergePlaceholderPullRequests(rows: PullRequestMetadata[]): Promise<void> {
+    await this.writeBatch(queries.BATCH_MERGE_PLACEHOLDER_PULL_REQUESTS, rows);
+  }
+
+  async retirePlaceholderPullRequests(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    await this.client.query(this.workspaceId, queries.RETIRE_PLACEHOLDER_PULL_REQUESTS, { ids });
+  }
+
+  async writeGitHubPersons(persons: { id: string; login: string }[]): Promise<void> {
+    await this.writeBatch(queries.BATCH_MERGE_GITHUB_PERSONS, persons);
+  }
+
+  async setPersonLogins(persons: { id: string; login: string }[]): Promise<void> {
+    await this.writeBatch(queries.BATCH_SET_PERSON_LOGIN, persons);
+  }
+
+  async writeReviewedEdges(
+    edges: { reviewer_id: string; pr_id: string; state: string; count: number; last_at: number }[]
+  ): Promise<void> {
+    await this.writeBatch(queries.BATCH_EDGES_REVIEWED, edges);
+  }
+
+  async writeIssues(
+    issues: { id: string; number: number; title: string; state: string; url: string; created_at: number }[]
+  ): Promise<void> {
+    await this.writeBatch(queries.BATCH_MERGE_ISSUES, issues);
+  }
+
+  async writeClosesEdges(edges: { pr_id: string; issue_id: string }[]): Promise<void> {
+    await this.writeBatch(queries.BATCH_EDGES_CLOSES, edges);
+  }
+
+  /** Derives (Issue)-[:AFFECTS]->(Component) for the given issues from the files their PRs touch. */
+  async deriveIssueAffects(issueIds: string[]): Promise<void> {
+    for (let i = 0; i < issueIds.length; i += 200) {
+      await this.client.query(this.workspaceId, queries.BATCH_DERIVE_ISSUE_AFFECTS, {
+        ids: issueIds.slice(i, i + 200),
+      });
+    }
+  }
+
+  async replaceComponentOwnership(owners: {
+    persons: { owner_id: string; component_name: string; pattern: string; coverage: number }[];
+    teams: { id: string; name: string }[];
+    teamEdges: { owner_id: string; component_name: string; pattern: string; coverage: number }[];
+  }): Promise<void> {
+    await this.client.query(this.workspaceId, queries.DELETE_COMPONENT_OWNERSHIP);
+    await this.writeBatch(queries.BATCH_MERGE_TEAMS, owners.teams);
+    await this.writeBatch(queries.BATCH_EDGES_OWNS_PERSON, owners.persons);
+    await this.writeBatch(queries.BATCH_EDGES_OWNS_TEAM, owners.teamEdges);
+  }
+
+  async setJobGitHubStatus(jobId: string, status: string, note: string | null): Promise<void> {
+    await this.client.query(this.workspaceId, queries.SET_JOB_GITHUB_STATUS, {
+      jobId,
+      status,
+      note: note ? redactSecrets(note).slice(0, 500) : null,
+    });
+  }
+
+  /** Pull request number -> id of the node that already carries it (numbers are unique). */
+  async readPullRequestIdsByNumber(numbers: number[]): Promise<Map<number, string>> {
+    const out = new Map<number, string>();
+    for (let i = 0; i < numbers.length; i += 500) {
+      const res = await this.client.roQuery<{ number: unknown; id: unknown }>(
+        this.workspaceId,
+        queries.READ_PULL_REQUEST_IDS_BY_NUMBER,
+        { numbers: numbers.slice(i, i + 500) }
+      );
+      for (const row of res.data ?? []) out.set(Number(row.number), String(row.id));
+    }
+    return out;
+  }
+
+  /** Which of these ids already exist in the graph (used to report what a re-sync added). */
+  async existingIds(kind: 'pull_request' | 'decision' | 'file', keys: string[]): Promise<Map<string, string | null>> {
+    const out = new Map<string, string | null>();
+    const [query, param, field] =
+      kind === 'pull_request'
+        ? [queries.READ_EXISTING_PULL_REQUEST_IDS, 'ids', 'id']
+        : kind === 'decision'
+          ? [queries.READ_EXISTING_DECISIONS, 'ids', 'id']
+          : [queries.READ_EXISTING_FILES, 'paths', 'path'];
+    for (let i = 0; i < keys.length; i += 500) {
+      const res = await this.client.roQuery<Record<string, unknown>>(this.workspaceId, query, {
+        [param]: keys.slice(i, i + 500),
+      });
+      for (const row of res.data ?? []) {
+        out.set(String(row[field]), row.status == null ? null : String(row.status));
+      }
+    }
+    return out;
   }
 
   async linkUserToMinedPersons(

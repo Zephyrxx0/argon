@@ -77,6 +77,17 @@ describe('ingestion pipeline integration', () => {
       expect(firstDep.count).toBeGreaterThanOrEqual(3);
       expect(firstDep.weight).toBeGreaterThanOrEqual(0.15);
 
+      // 4b. Verify file-level CO_CHANGES edges
+      const coChangeResult = await client.roQuery(
+        workspaceId,
+        `MATCH (a:File)-[r:CO_CHANGES]->(b:File)
+         RETURN a.path AS src, b.path AS target, r.weight AS weight, r.count AS count`
+      );
+      expect(coChangeResult.data!.length).toBeGreaterThan(0);
+      const firstCo = (coChangeResult.data as any)[0];
+      expect(firstCo.count).toBeGreaterThanOrEqual(3);
+      expect(firstCo.weight).toBeGreaterThanOrEqual(0.15);
+
       // 5. Verify Git Revert relationship
       const revertResult = await client.roQuery(
         workspaceId,

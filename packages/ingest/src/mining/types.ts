@@ -5,12 +5,19 @@ export interface MinedDecision {
   valid_from: number; // epoch seconds
   valid_to: number | null; // epoch seconds or null if active
   source_url: string;
-  source_kind: 'adr' | 'rfc' | 'commit' | 'pr' | 'doc';
+  source_kind: 'adr' | 'rfc' | 'commit' | 'pr' | 'doc' | 'comment';
   summary: string;
   raw_text: string;
   embedding?: number[];
   supersedes_id?: string;
   component_name?: string;
+  /**
+   * Where the decision was found. Never stored on the Decision node itself: used to write the
+   * `(Decision)-[:EXTRACTED_FROM]->(PullRequest)` provenance edge and a clickable `source_url`.
+   */
+  origin_commit?: string; // full git hash of the commit whose message is the decision
+  origin_path?: string; // repo-relative path of the ADR / RFC document
+  origin_pr?: string; // PullRequest node id (e.g. a decision made in a PR review comment)
 }
 
 export interface RevertLink {

@@ -9,6 +9,21 @@ import { mineCommitDecisions } from './mining/commits.js';
 import { embedDecisionsBestEffort } from './mining/embed.js';
 import { FalkorIngestWriter } from './writer/falkordb.js';
 import { redactSecrets } from './git/redact.js';
+import { simpleGit } from 'simple-git';
+import { resolveComponentForFile } from './coupling/components.js';
+import { IdentityResolver } from './github/identity.js';
+import { createDefaultGitHubApi } from './github/octokit-api.js';
+import { parseGitHubRepo, type GitHubRepo } from './github/repo.js';
+import type { GitHubApi } from './github/types.js';
+import {
+  ANONYMOUS_LIMITS,
+  AUTHENTICATED_LIMITS,
+  collectGitHubData,
+  type GitHubGraphData,
+  type GitHubLimits,
+} from './github/enrich.js';
+import { applyDecisionProvenance, commitNodeId, findFirstAddCommits } from './mining/provenance.js';
+import { classifyOwner, computeComponentOwnership, readCodeOwners } from './mining/codeowners.js';
 
 /** How often a running job proves it is alive (readers treat a few missed beats as "dead"). */
 export const JOB_HEARTBEAT_INTERVAL_MS = 15_000;
@@ -45,6 +60,31 @@ export interface IngestPipelineConfig {
   userId?: string;
   userLogin?: string;
   userEmails?: string[];
+  /**
+   * GitHub pull requests / reviews / issues ("Company Brain"). Runs for github.com repositories
+   * unless `false`; always best-effort (a failure here never fails the ingestion). Tests inject
+   * `api`; `owner`/`repo` name the repository when `repoUrl` is not a github.com URL.
+   */
+  github?: false | GitHubEnrichmentConfig;
+}
+
+export interface GitHubEnrichmentConfig {
+  api?: GitHubApi;
+  owner?: string;
+  repo?: string;
+  /** Overrides the request caps (authenticated by default; reduced when there is no token). */
+  limits?: Partial<GitHubLimits>;
+  /** ISO timestamp: only read PRs / issues updated since then (re-sync). */
+  since?: string;
+}
+
+/** What this run added to the graph, for re-sync notifications. Lists are capped. */
+export interface IngestDelta {
+  newCommitCount: number;
+  newCommits: string[];
+  newFiles: string[];
+  newDecisions: string[];
+  supersededDecisions: string[];
 }
 
 export interface IngestSummary {
@@ -58,7 +98,19 @@ export interface IngestSummary {
   decisionCount: number;
   revertCount: number;
   durationMs: number;
+  pullRequestCount: number;
+  reviewCount: number;
+  issueCount: number;
+  /** Component ownership edges from CODEOWNERS. */
+  ownerCount: number;
+  /** `skipped` = not a github.com repository (or disabled), `partial` = rate limited / some calls failed. */
+  githubStatus: 'skipped' | 'completed' | 'partial';
+  githubNotes: string[];
+  delta: IngestDelta;
 }
+
+const DELTA_LIST_CAP = 200;
+
 
 /**
  * Executes the complete ingestion pipeline for a repository into a FalkorDB workspace.
@@ -107,12 +159,79 @@ export async function runIngestion(config: IngestPipelineConfig): Promise<Ingest
     const adrDecisions = await scanAdrFiles(cloneDir);
     const commitDecisions = mineCommitDecisions(repoData.commits);
     const allRawDecisions = [...adrDecisions, ...commitDecisions];
-    const { decisions, supersedesLinks } = resolveSupersessions(allRawDecisions);
+    const resolved = resolveSupersessions(allRawDecisions);
+    let decisions = resolved.decisions;
+    const supersedesLinks = resolved.supersedesLinks;
     const reverts = mineReverts(repoData.commits);
+
+    // Stage 6b: GitHub pull requests, reviews, issues (best effort, read-only, no DB writes yet)
+    const githubRepo = resolveGitHubRepo(config);
+    const identity = new IdentityResolver(
+      Array.from(repoData.authors.values()).map((a) => ({ id: a.id, name: a.name }))
+    );
+    const componentNames = new Set(coupling.components.map((c) => c.name));
+    let github: GitHubGraphData | undefined;
+    let githubStatus: IngestSummary['githubStatus'] = 'skipped';
+    const githubNotes: string[] = [];
+
+    if (githubRepo && config.github !== false && process.env.ARGON_GITHUB_ENRICH !== 'off') {
+      try {
+        const token = config.accessToken ?? config.installationToken;
+        const api = config.github?.api ?? (await createDefaultGitHubApi(token));
+        const limits: GitHubLimits = {
+          ...(token || config.github?.api ? AUTHENTICATED_LIMITS : ANONYMOUS_LIMITS),
+          ...config.github?.limits,
+        };
+        const localClone = cloneDir;
+        github = await collectGitHubData({
+          repo: githubRepo,
+          api,
+          commits: repoData.commits,
+          identity,
+          limits,
+          since: config.github?.since,
+          componentNames,
+          lookupExistingPrIds: async (numbers) => {
+            try {
+              return await writer.readPullRequestIdsByNumber(numbers);
+            } catch {
+              return new Map();
+            }
+          },
+          filesForCommit: (hash) => mergeCommitFiles(localClone, hash),
+        });
+        githubStatus = github.status;
+        githubNotes.push(...github.notes);
+      } catch (err: any) {
+        githubStatus = 'partial';
+        githubNotes.push(`GitHub stage failed: ${redactSecrets(err?.message ?? String(err)).slice(0, 200)}`);
+      }
+    }
+    if (github && github.commentDecisions.length > 0) {
+      decisions = [...decisions, ...github.commentDecisions];
+    }
+
+    // Provenance (offline): EXTRACTED_FROM edges and clickable source URLs. After supersession
+    // resolution, which matches on the original source_url.
+    const addCommits = adrDecisions.length > 0 ? await findFirstAddCommits(cloneDir, config.maxCommits ?? 1000) : undefined;
+    const extractedFromEdges = applyDecisionProvenance({
+      decisions,
+      commits: repoData.commits,
+      repo: parseGitHubRepo(config.repoUrl) ?? githubRepo,
+      addCommits,
+    });
+
+    // CODEOWNERS (offline): owner of record per component
+    const codeOwners = await readCodeOwners(cloneDir);
+    const ownership = codeOwners ? computeComponentOwnership(codeOwners.rules, coupling.components) : [];
+    const ownerRows = resolveOwnership(ownership, identity);
 
     // Stage 7: Decision Indexing & Embedding (0.80)
     await writer.updateJobStatus(jobId, config.repoUrl, 'indexing', 0.80);
     await embedDecisionsBestEffort(decisions);
+
+    // What is new in this run (re-sync notifications). Read before anything is written.
+    const delta = await computeDelta(writer, repoData.commits, decisions, Array.from(repoData.files));
 
     // Stage 8: Graph Database Insertion via Parameterized UNWIND Batches
     // 8a. Persons
@@ -171,6 +290,9 @@ export async function runIngestion(config: IngestPipelineConfig): Promise<Ingest
     // (Component)-[:DEPENDS_ON]->(Component)
     await writer.writeDependsOnEdges(coupling.componentEdges);
 
+    // (File)-[:CO_CHANGES]->(File)  (files must already exist: written in 8b)
+    await writer.writeCoChangesEdges(coupling.fileEdges);
+
     // (PullRequest)-[:REVERTS]->(PullRequest)
     const revertEdges = reverts.map((r) => ({
       revert_id: `pr_${r.revert_commit_hash.slice(0, 12)}`,
@@ -182,20 +304,63 @@ export async function runIngestion(config: IngestPipelineConfig): Promise<Ingest
     await writer.writeSupersedesEdges(supersedesLinks);
 
     // (Decision)-[:GOVERNS]->(Component)
-    // Map decisions to component if path/topic matches or default to root
+    // A decision governs its explicit component; a commit-mined decision governs the components
+    // that commit changed (top 3); anything else falls back to the first component (or 'root').
+    const filesByCommit = new Map(repoData.commits.map((c) => [c.hash, c.files.map((f) => f.path)]));
     const governsEdges: { decision_id: string; component_name: string }[] = [];
     for (const d of decisions) {
-      if (d.component_name) {
-        governsEdges.push({ decision_id: d.id, component_name: d.component_name });
-      } else {
-        // Link to root or first component
-        governsEdges.push({
-          decision_id: d.id,
-          component_name: coupling.components[0]?.name || 'root',
-        });
+      const touched = d.origin_commit
+        ? topComponents(filesByCommit.get(d.origin_commit) ?? [], componentNames, 3)
+        : [];
+      const targets = d.component_name
+        ? [d.component_name]
+        : touched.length > 0
+          ? touched
+          : [coupling.components[0]?.name || 'root'];
+      for (const component_name of targets) {
+        governsEdges.push({ decision_id: d.id, component_name });
       }
     }
     await writer.writeGovernsEdges(governsEdges);
+
+    // (Decision)-[:EXTRACTED_FROM]->(PullRequest): provenance for commit- and ADR-mined decisions.
+    // Edges to GitHub placeholder PRs are written after those nodes exist (below).
+    await writer.writeExtractedFromEdges(extractedFromEdges.filter((e) => !e.pr_id.startsWith('pr_gh_')));
+
+    // Stage 8e: GitHub pull requests, reviews, issues + CODEOWNERS ownership (best effort)
+    let reviewCount = 0;
+    let issueCount = 0;
+    let pullRequestCount = 0;
+    try {
+      await writer.writeGitHubPersons(identity.newPersons);
+      await writer.setPersonLogins(identity.linkedPersons);
+      if (github) {
+        await writer.retirePlaceholderPullRequests(github.retirePlaceholderIds);
+        await writer.updatePullRequests(github.mappedPullRequests);
+        await writer.mergePlaceholderPullRequests(github.placeholderPullRequests);
+        await writer.writeAuthoredEdges(github.authored);
+        await writer.writeTouchesEdges(github.extraTouches);
+        await writer.writeReviewedEdges(github.reviews);
+        await writer.writeIssues(github.issues);
+        await writer.writeClosesEdges(github.closes);
+        await writer.deriveIssueAffects(github.issues.map((i) => i.id));
+        await writer.writeExtractedFromEdges(extractedFromEdges.filter((e) => e.pr_id.startsWith('pr_gh_')));
+        reviewCount = github.reviews.length;
+        issueCount = github.issues.length;
+        pullRequestCount = github.mappedPullRequests.length + github.placeholderPullRequests.length;
+      }
+      await writer.replaceComponentOwnership(ownerRows);
+    } catch (err: any) {
+      githubStatus = 'partial';
+      githubNotes.push(`writing GitHub data failed: ${redactSecrets(err?.message ?? String(err)).slice(0, 200)}`);
+    }
+    if (githubRepo) {
+      try {
+        await writer.setJobGitHubStatus(jobId, githubStatus, githubNotes.join('; ') || null);
+      } catch {
+        // informational only
+      }
+    }
 
     // Stage 8d: Identity Linking (:User)-[:IDENTIFIES]->(:Person) (TENANT-02, D-13, D-14, D-15)
     if (config.userId && config.userLogin) {
@@ -220,6 +385,13 @@ export async function runIngestion(config: IngestPipelineConfig): Promise<Ingest
       decisionCount: decisions.length,
       revertCount: reverts.length,
       durationMs: Date.now() - startTime,
+      pullRequestCount,
+      reviewCount,
+      issueCount,
+      ownerCount: ownerRows.persons.length + ownerRows.teamEdges.length,
+      githubStatus,
+      githubNotes,
+      delta,
     };
   } catch (error: any) {
     const rawError = error?.message || String(error);
@@ -231,4 +403,100 @@ export async function runIngestion(config: IngestPipelineConfig): Promise<Ingest
       await cleanupFn();
     }
   }
+}
+
+/** The github.com repository this ingestion is about, from the URL or an explicit override. */
+function resolveGitHubRepo(config: IngestPipelineConfig): GitHubRepo | null {
+  const override = config.github && config.github.owner && config.github.repo ? config.github : null;
+  if (override) {
+    const owner = override.owner!;
+    const repo = override.repo!;
+    return { owner, repo, webUrl: `https://github.com/${owner}/${repo}` };
+  }
+  return parseGitHubRepo(config.repoUrl);
+}
+
+/** Files a merge commit brought in (git log lists none for merges): diff against its first parent. */
+async function mergeCommitFiles(repoPath: string, hash: string): Promise<string[]> {
+  try {
+    const out = await simpleGit(repoPath).raw(['diff', '--name-only', `${hash}^1`, hash]);
+    return out.split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 500);
+  } catch {
+    return [];
+  }
+}
+
+/** Turns CODEOWNERS ownership into graph rows, resolving `@login` owners to Person nodes. */
+function resolveOwnership(
+  ownership: ReturnType<typeof computeComponentOwnership>,
+  identity: IdentityResolver
+) {
+  const persons: { owner_id: string; component_name: string; pattern: string; coverage: number }[] = [];
+  const teamEdges: { owner_id: string; component_name: string; pattern: string; coverage: number }[] = [];
+  const teams = new Map<string, { id: string; name: string }>();
+
+  for (const o of ownership) {
+    const owner = classifyOwner(o.owner);
+    if (!owner) continue;
+    const common = { component_name: o.component, pattern: o.pattern, coverage: o.coverage };
+    if (owner.kind === 'team') {
+      teams.set(owner.id, { id: owner.id, name: owner.name });
+      teamEdges.push({ owner_id: owner.id, ...common });
+    } else if (owner.kind === 'user') {
+      persons.push({ owner_id: identity.resolve(owner.login), ...common });
+    } else {
+      // an email is only usable when it is a known git author (emails are never stored)
+      const id = identity.resolveEmail(owner.email);
+      if (id) persons.push({ owner_id: id, ...common });
+    }
+  }
+  return { persons, teams: [...teams.values()], teamEdges };
+}
+
+async function computeDelta(
+  writer: FalkorIngestWriter,
+  commits: { hash: string; files: { path: string }[] }[],
+  decisions: { id: string; status: string }[],
+  files: string[]
+): Promise<IngestDelta> {
+  const empty: IngestDelta = {
+    newCommitCount: commits.length,
+    newCommits: commits.map((c) => commitNodeId(c.hash)).slice(0, DELTA_LIST_CAP),
+    newFiles: files.slice(0, DELTA_LIST_CAP),
+    newDecisions: decisions.map((d) => d.id).slice(0, DELTA_LIST_CAP),
+    supersededDecisions: [],
+  };
+  try {
+    const [prs, existingDecisions, existingFiles] = await Promise.all([
+      writer.existingIds('pull_request', commits.map((c) => commitNodeId(c.hash))),
+      writer.existingIds('decision', decisions.map((d) => d.id)),
+      writer.existingIds('file', files),
+    ]);
+    const newCommits = commits.map((c) => commitNodeId(c.hash)).filter((id) => !prs.has(id));
+    return {
+      newCommitCount: newCommits.length,
+      newCommits: newCommits.slice(0, DELTA_LIST_CAP),
+      newFiles: files.filter((f) => !existingFiles.has(f)).slice(0, DELTA_LIST_CAP),
+      newDecisions: decisions.filter((d) => !existingDecisions.has(d.id)).map((d) => d.id).slice(0, DELTA_LIST_CAP),
+      supersededDecisions: decisions
+        .filter((d) => d.status === 'superseded' && existingDecisions.has(d.id) && existingDecisions.get(d.id) !== 'superseded')
+        .map((d) => d.id)
+        .slice(0, DELTA_LIST_CAP),
+    };
+  } catch {
+    return empty;
+  }
+}
+
+/** The components (that exist in the graph) most touched by a set of files, most files first. */
+function topComponents(files: string[], known: Set<string>, limit: number): string[] {
+  const counts = new Map<string, number>();
+  for (const file of files) {
+    const component = resolveComponentForFile(file);
+    if (known.has(component)) counts.set(component, (counts.get(component) ?? 0) + 1);
+  }
+  return [...counts]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([name]) => name);
 }

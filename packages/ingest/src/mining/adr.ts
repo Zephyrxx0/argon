@@ -108,6 +108,7 @@ export function parseAdrDocument(
     summary,
     raw_text: content.slice(0, 4000),
     supersedes_id: supersedesRef || undefined,
+    origin_path: normalizedPath,
   };
 }
 

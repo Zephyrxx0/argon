@@ -14,6 +14,16 @@ export * from './mining/adr.js';
 export * from './mining/reverts.js';
 export * from './mining/commits.js';
 export * from './mining/embed.js';
+export * from './mining/provenance.js';
+export * from './mining/codeowners.js';
+
+export * from './github/types.js';
+export * from './github/repo.js';
+export * from './github/references.js';
+export * from './github/identity.js';
+export * from './github/comments.js';
+export * from './github/enrich.js';
+export * from './github/octokit-api.js';
 
 export * from './writer/queries.js';
 export * from './writer/falkordb.js';

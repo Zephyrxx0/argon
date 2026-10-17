@@ -37,6 +37,7 @@ export function mineCommitDecisions(commits: GitCommit[]): MinedDecision[] {
       source_kind: 'commit',
       summary: summary.slice(0, 300),
       raw_text: fullText.slice(0, 2000),
+      origin_commit: commit.hash,
     });
   }
 
