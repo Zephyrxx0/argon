@@ -16,7 +16,13 @@ import type {
   PathBetweenResult,
   ComponentOverviewParams,
   ComponentOverviewResult,
+  RevertHistoryParams,
+  RevertHistoryResult,
 } from '@argon/graph';
+
+import type { ToolTraceEntry } from '../tools/trace.js';
+import type { Verdict } from '../verdict/verdict.js';
+import type { CodeOwnerItem, EvidenceSource } from '../briefing/types.js';
 
 export type QueryName =
   | 'resolveScope'
@@ -26,7 +32,8 @@ export type QueryName =
   | 'constrainingDecisions'
   | 'precedentSearch'
   | 'pathBetween'
-  | 'componentOverview';
+  | 'componentOverview'
+  | 'revertHistory';
 
 export interface QueryParamsMap {
   resolveScope: ResolveScopeParams;
@@ -37,6 +44,7 @@ export interface QueryParamsMap {
   precedentSearch: PrecedentSearchParams;
   pathBetween: PathBetweenParams;
   componentOverview: ComponentOverviewParams;
+  revertHistory: RevertHistoryParams;
 }
 
 export interface QueryResultMap {
@@ -48,6 +56,7 @@ export interface QueryResultMap {
   precedentSearch: PrecedentSearchResult;
   pathBetween: PathBetweenResult;
   componentOverview: ComponentOverviewResult;
+  revertHistory: RevertHistoryResult;
 }
 
 export interface BriefingRequest {
@@ -59,12 +68,33 @@ export interface BriefingRequest {
   anonymousSessionId?: string;
 }
 
+export interface ToolSelectionSummary {
+  /** `skipped` = the fixed pipeline ran alone (no model configured or disabled). */
+  status: 'completed' | 'failed' | 'skipped';
+  reason?: string;
+  steps: number;
+  /** Number of extra tool calls the LLM planner made. */
+  llmCallCount: number;
+}
+
 export interface BriefingResponse {
   status: 'SUCCESS' | 'NO_GRAPH_DATA' | 'CITATION_INTEGRITY_FAILURE' | 'ERROR';
   briefingId?: string;
   briefing?: unknown;
   evidence?: unknown;
   reason?: string;
+  /** Deterministic, graph-derived PROCEED / REVIEW / HOLD verdict (SUCCESS only). */
+  verdict?: Verdict;
+  /** Every graph tool call behind this answer, in order. */
+  toolTrace?: ToolTraceEntry[];
+  toolSelection?: ToolSelectionSummary;
+  /**
+   * Clickable provenance for the cited nodes (commit / ADR / pull request / issue links), taken
+   * from graph properties only (SUCCESS only).
+   */
+  sources?: EvidenceSource[];
+  /** CODEOWNERS owners of record for the components in scope (SUCCESS only). */
+  codeOwners?: CodeOwnerItem[];
 }
 
 export interface GatewayClient {

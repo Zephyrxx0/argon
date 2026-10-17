@@ -1,4 +1,4 @@
-import { generateObject } from 'ai';
+import { generateObject, generateText } from 'ai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import type { z } from 'zod';
 
@@ -129,4 +129,64 @@ export async function generateStructuredWithFallback<T>(
       `Both primary (${primaryModel}) and fallback (${fallbackModel}) models failed. Last primary error: ${lastError?.message}. Fallback error: ${fallbackErr?.message}`
     );
   }
+}
+
+export interface JsonTextOptions {
+  apiKey?: string;
+  primaryModel?: string;
+  fallbackModel?: string;
+  /** Test seam: returns the raw model text for (modelName, prompt). */
+  caller?: (modelName: string, prompt: string) => Promise<string>;
+}
+
+/**
+ * Free-text JSON generation with model fallback, parsed leniently (markdown fences and
+ * surrounding prose are tolerated). Used where a provider-side response schema is a poor
+ * fit (e.g. the tool planner, whose `args` are free-form per tool) and for Gemma, which
+ * does not support native function calling.
+ */
+export async function generateJsonWithFallback(
+  prompt: string,
+  options?: JsonTextOptions
+): Promise<unknown> {
+  const primaryModel = options?.primaryModel ?? 'gemma-4-31b-it';
+  const fallbackModel = options?.fallbackModel ?? 'gemini-2.5-flash-lite';
+  const apiKey =
+    options?.apiKey ??
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY ??
+    process.env.GEMINI_API_KEY ??
+    '';
+
+  const callModel =
+    options?.caller ??
+    (async (modelName: string, promptText: string): Promise<string> => {
+      const google = createGoogleGenerativeAI({ apiKey });
+      const result = await generateText({ model: google(modelName) as any, prompt: promptText });
+      return result.text;
+    });
+
+  const attempt = async (modelName: string): Promise<unknown> => {
+    const text = await callModel(modelName, prompt);
+    const json = extractJsonText(text);
+    if (!json) throw new Error(`Model ${modelName} returned no JSON object`);
+    return JSON.parse(json);
+  };
+
+  try {
+    return await attempt(primaryModel);
+  } catch (primaryErr: any) {
+    console.warn(`[LLM] Primary model (${primaryModel}) failed for JSON generation: ${primaryErr?.message}. Falling back to ${fallbackModel}`);
+    try {
+      return await attempt(fallbackModel);
+    } catch (fallbackErr: any) {
+      throw new Error(
+        `Both primary (${primaryModel}) and fallback (${fallbackModel}) models failed. Primary: ${primaryErr?.message}. Fallback: ${fallbackErr?.message}`
+      );
+    }
+  }
+}
+
+/** True when an API key for the default (Gemini-API) models is configured. */
+export function hasLlmApiKey(): boolean {
+  return Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY);
 }

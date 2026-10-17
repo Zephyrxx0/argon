@@ -87,6 +87,9 @@ describe('Gemma 4 Briefing Narrator & Schema Validation', () => {
         similarityScore: 0.88,
       },
     ],
+    reverts: [],
+    riskRanking: [],
+    toolFindings: [],
     allNodeIds: new Set([
       'packages/graph/src/client.ts',
       'apps/gateway',

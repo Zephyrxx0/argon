@@ -9,6 +9,7 @@ import {
   precedentSearch,
   pathBetween,
   componentOverview,
+  revertHistory,
 } from '@argon/graph';
 import {
   type GatewayClient,
@@ -79,6 +80,12 @@ export class DirectGraphGatewayClient implements GatewayClient {
         )) as DualPayload<QueryResultMap[K]>;
       case 'componentOverview':
         return (await componentOverview(
+          this.client,
+          workspaceId,
+          params as any
+        )) as DualPayload<QueryResultMap[K]>;
+      case 'revertHistory':
+        return (await revertHistory(
           this.client,
           workspaceId,
           params as any

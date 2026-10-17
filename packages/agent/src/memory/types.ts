@@ -7,6 +7,10 @@ export interface RecordOutcomeParams {
   citedNodeIds: string[];
   affectedComponents: string[];
   scopeHash?: string;
+  /** Graph-driven verdict recorded with the briefing (PROCEED | REVIEW | HOLD). */
+  verdict?: string;
+  /** Number of graph tool calls that produced the briefing. */
+  toolCallCount?: number;
 }
 
 export interface RecordOutcomeResult {

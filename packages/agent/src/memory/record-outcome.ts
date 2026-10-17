@@ -8,7 +8,9 @@ SET b.task = $task,
     b.summary = $summary,
     b.actor_id = $actorId,
     b.created_at = $createdAt,
-    b.scope_hash = $scopeHash
+    b.scope_hash = $scopeHash,
+    b.verdict = $verdict,
+    b.tool_call_count = $toolCallCount
 RETURN b.id AS id
 `;
 
@@ -40,6 +42,8 @@ export async function recordOutcome(
   const createdAt = Math.floor(Date.now() / 1000);
   const actorId = params.contributorId ?? params.actorId ?? 'anonymous';
   const scopeHash = params.scopeHash ?? '';
+  const verdict = params.verdict ?? '';
+  const toolCallCount = params.toolCallCount ?? 0;
 
   // 1. Create (:Briefing) node
   await graphClient.query(params.workspaceId, CREATE_BRIEFING_NODE, {
@@ -49,6 +53,8 @@ export async function recordOutcome(
     actorId,
     createdAt,
     scopeHash,
+    verdict,
+    toolCallCount,
   });
 
   let citesCount = 0;

@@ -7,6 +7,7 @@ export * from './schemas/briefing.js';
 export * from './briefing/types.js';
 export * from './briefing/resolver.js';
 export * from './briefing/dispatcher.js';
+export * from './briefing/provenance.js';
 export * from './briefing/prompt.js';
 export * from './briefing/llm.js';
 export * from './briefing/narrator.js';
@@ -18,3 +19,8 @@ export * from './citations/validator.js';
 export * from './memory/types.js';
 export * from './memory/record-outcome.js';
 
+
+export * from './tools/trace.js';
+export * from './tools/toolbox.js';
+export * from './tools/planner.js';
+export * from './verdict/verdict.js';
