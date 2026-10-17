@@ -37,6 +37,19 @@ describe('cloneRepository auth & header injection', () => {
     }
   });
 
+  it('clones with accessToken (OAuth) without leaking it into .git/config', async () => {
+    const token = 'gho_OAUTH_TEST_TOKEN_1234567890';
+    const result = await cloneRepository(`file://${fixture.dir}`, { blobless: false, accessToken: token });
+    try {
+      const configContent = await fs.promises.readFile(path.join(result.dir, '.git', 'config'), 'utf8');
+      expect(configContent).not.toContain(token);
+      expect(configContent).not.toContain('x-access-token');
+      expect(configContent).not.toContain('http.extraheader');
+    } finally {
+      await result.cleanup();
+    }
+  });
+
   it('transforms git auth failure into sanitized GitHubAuthError', async () => {
     // Attempting to clone a non-existent remote with auth failure triggers GitHubAuthError
     await expect(

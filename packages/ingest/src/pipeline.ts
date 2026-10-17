@@ -38,6 +38,9 @@ export interface IngestPipelineConfig {
   maxCommits?: number;
   keepClone?: boolean;
   client?: ArgonGraphClient;
+  /** OAuth/installation token for cloning private repos. */
+  accessToken?: string;
+  /** @deprecated use accessToken */
   installationToken?: string;
   userId?: string;
   userLogin?: string;
@@ -86,7 +89,7 @@ export async function runIngestion(config: IngestPipelineConfig): Promise<Ingest
     const cloneResult = await cloneRepository(config.repoUrl, {
       depth: config.depth,
       keepClone: config.keepClone,
-      installationToken: config.installationToken,
+      accessToken: config.accessToken ?? config.installationToken,
     });
     cloneDir = cloneResult.dir;
     cleanupFn = cloneResult.cleanup;

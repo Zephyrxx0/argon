@@ -43,8 +43,9 @@ export async function cloneRepository(repoUrl: string, options: CloneOptions = {
     cloneArgs.push(`--branch=${options.branch}`);
   }
 
-  if (options.installationToken) {
-    const creds = Buffer.from(`x-access-token:${options.installationToken}`).toString('base64');
+  const cloneToken = options.accessToken ?? options.installationToken;
+  if (cloneToken) {
+    const creds = Buffer.from(`x-access-token:${cloneToken}`).toString('base64');
     cloneArgs.unshift('-c', `http.extraheader=Authorization: Basic ${creds}`);
   }
 

@@ -4,6 +4,9 @@ export interface CloneOptions {
   depth?: number;
   blobless?: boolean;
   keepClone?: boolean;
+  /** OAuth or installation token used to clone private repositories (sent as x-access-token). */
+  accessToken?: string;
+  /** @deprecated use `accessToken`. Kept for backward compatibility. */
   installationToken?: string;
 }
 
