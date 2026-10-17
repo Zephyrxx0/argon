@@ -1118,7 +1118,8 @@
         -0.068702,
         0.003272,
         0.054426
-      ]
+      ],
+      "extracted_from": "PR-3310ba3"
     },
     {
       "id": "ADR-003",
@@ -1643,7 +1644,8 @@
         0.029657,
         0.006166,
         -0.046101
-      ]
+      ],
+      "extracted_from": "PR-5532dc5"
     },
     {
       "id": "ADR-004",
@@ -2168,7 +2170,8 @@
         0.032402,
         -0.073121,
         -0.027815
-      ]
+      ],
+      "extracted_from": "PR-7754fe7"
     },
     {
       "id": "ADR-005",
@@ -2693,7 +2696,8 @@
         0.07291,
         -0.007781,
         -0.072334
-      ]
+      ],
+      "extracted_from": "PR-9976ba9"
     },
     {
       "id": "ADR-006",
@@ -3218,7 +3222,8 @@
         -0.002101,
         0.022506,
         -0.047712
-      ]
+      ],
+      "extracted_from": "PR-2298dc1"
     }
   ],
   "reverts": [
@@ -3348,6 +3353,124 @@
       "target": "web-frontend",
       "weight": 0.85,
       "count": 18
+    }
+  ],
+  "reviewed": [
+    {
+      "reviewer_id": "P-002",
+      "pr_id": "PR-1198fe1",
+      "state": "APPROVED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "P-003",
+      "pr_id": "PR-1198fe1",
+      "state": "COMMENTED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "P-003",
+      "pr_id": "PR-3310ba3",
+      "state": "APPROVED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "P-001",
+      "pr_id": "PR-5532dc5",
+      "state": "APPROVED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "P-002",
+      "pr_id": "PR-5532dc5",
+      "state": "COMMENTED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "P-003",
+      "pr_id": "PR-7754fe7",
+      "state": "APPROVED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "P-001",
+      "pr_id": "PR-9976ba9",
+      "state": "APPROVED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "P-003",
+      "pr_id": "PR-9976ba9",
+      "state": "COMMENTED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "P-003",
+      "pr_id": "PR-2298dc1",
+      "state": "APPROVED",
+      "count": 1
+    }
+  ],
+  "issues": [
+    {
+      "id": "issue_14",
+      "number": 14,
+      "title": "Citation validator accepts claims with unverified node ids",
+      "state": "closed",
+      "created_at": 1728150000,
+      "closed_by": [
+        "PR-5532dc5"
+      ]
+    },
+    {
+      "id": "issue_21",
+      "number": 21,
+      "title": "Blast radius query built with string concatenation",
+      "state": "closed",
+      "created_at": 1728250000,
+      "closed_by": [
+        "PR-7754fe7"
+      ]
+    },
+    {
+      "id": "issue_27",
+      "number": 27,
+      "title": "FalkorDB client gives up after one failed connection",
+      "state": "closed",
+      "created_at": 1728350000,
+      "closed_by": [
+        "PR-9976ba9"
+      ]
+    },
+    {
+      "id": "issue_33",
+      "number": 33,
+      "title": "Embedding dimension mismatch between index and query",
+      "state": "open",
+      "created_at": 1728450000
+    }
+  ],
+  "owners": [
+    {
+      "owner_id": "P-001",
+      "kind": "person",
+      "component": "monorepo-core",
+      "pattern": "/packages/ingest/",
+      "coverage": 1.0
+    },
+    {
+      "owner_id": "P-002",
+      "kind": "person",
+      "component": "query-engine",
+      "pattern": "/packages/graph/queries/",
+      "coverage": 1.0
+    },
+    {
+      "owner_id": "P-003",
+      "kind": "person",
+      "component": "citation-verifier",
+      "pattern": "/packages/agent/src/citations/",
+      "coverage": 1.0
     }
   ]
 }

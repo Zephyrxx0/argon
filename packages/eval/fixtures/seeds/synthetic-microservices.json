@@ -612,7 +612,8 @@
         -0.027892,
         0.005824,
         0.053026
-      ]
+      ],
+      "extracted_from": "PR-039"
     },
     {
       "id": "DEC-002",
@@ -1137,7 +1138,8 @@
         0.034274,
         0.031344,
         0.026657
-      ]
+      ],
+      "extracted_from": "PR-042"
     },
     {
       "id": "DEC-003",
@@ -2187,7 +2189,8 @@
         0.071387,
         -0.04587,
         -0.029466
-      ]
+      ],
+      "extracted_from": "PR-033"
     },
     {
       "id": "DEC-005",
@@ -2712,7 +2715,8 @@
         0.069428,
         0.045174,
         -0.036685
-      ]
+      ],
+      "extracted_from": "PR-065"
     },
     {
       "id": "DEC-006",
@@ -3237,7 +3241,8 @@
         -0.04607,
         0.009097,
         -0.040201
-      ]
+      ],
+      "extracted_from": "PR-071"
     },
     {
       "id": "DEC-007",
@@ -3762,7 +3767,8 @@
         0.045928,
         -0.035396,
         -0.034811
-      ]
+      ],
+      "extracted_from": "PR-076"
     },
     {
       "id": "DEC-008",
@@ -4287,7 +4293,8 @@
         -0.046529,
         -0.041327,
         -0.004335
-      ]
+      ],
+      "extracted_from": "PR-080"
     },
     {
       "id": "DEC-009",
@@ -6912,7 +6919,8 @@
         0.041411,
         -0.052136,
         0.053923
-      ]
+      ],
+      "extracted_from": "PR-124"
     }
   ],
   "reverts": [
@@ -6993,6 +7001,365 @@
       "files": [
         "src/gateway/rate-limiter.ts"
       ]
+    }
+  ],
+  "persons": [
+    {
+      "id": "person-alice",
+      "name": "Alice Nakamura"
+    },
+    {
+      "id": "person-bob",
+      "name": "Bob Okafor"
+    },
+    {
+      "id": "person-carol",
+      "name": "Carol Lindqvist"
+    },
+    {
+      "id": "person-dan",
+      "name": "Dan Petrov"
+    }
+  ],
+  "pullRequests": [
+    {
+      "id": "PR-033",
+      "number": 33,
+      "url": "https://github.com/argon/synthetic-demo/pull/33",
+      "state": "merged",
+      "title": "Move auth to stateless RS256 JWT",
+      "merged_at": 1677628800,
+      "files": [
+        "src/auth/jwt.ts",
+        "src/auth/middleware.ts"
+      ]
+    },
+    {
+      "id": "PR-039",
+      "number": 39,
+      "url": "https://github.com/argon/synthetic-demo/pull/39",
+      "state": "merged",
+      "title": "Linear backoff on gateway timeout",
+      "merged_at": 1685000000,
+      "files": [
+        "src/billing/retry.ts",
+        "src/billing/client.ts"
+      ]
+    },
+    {
+      "id": "PR-042",
+      "number": 42,
+      "url": "https://github.com/argon/synthetic-demo/pull/42",
+      "state": "merged"
+    },
+    {
+      "id": "PR-051",
+      "number": 51,
+      "url": "https://github.com/argon/synthetic-demo/pull/51",
+      "state": "merged",
+      "title": "Store sessions in Redis",
+      "merged_at": 1686400000,
+      "files": [
+        "src/auth/session.ts",
+        "src/auth/jwt.ts"
+      ]
+    },
+    {
+      "id": "PR-058",
+      "number": 58,
+      "url": "https://github.com/argon/synthetic-demo/pull/58",
+      "state": "merged"
+    },
+    {
+      "id": "PR-065",
+      "number": 65,
+      "url": "https://github.com/argon/synthetic-demo/pull/65",
+      "state": "merged",
+      "title": "Unbounded sync queue",
+      "merged_at": 1687600000,
+      "files": [
+        "src/sync/worker.ts",
+        "src/sync/quarantine.ts"
+      ]
+    },
+    {
+      "id": "PR-071",
+      "number": 71,
+      "url": "https://github.com/argon/synthetic-demo/pull/71",
+      "state": "merged"
+    },
+    {
+      "id": "PR-076",
+      "number": 76,
+      "url": "https://github.com/argon/synthetic-demo/pull/76",
+      "state": "merged",
+      "title": "Reduce gateway timeout to 500ms",
+      "merged_at": 1688600000,
+      "files": [
+        "src/gateway/proxy.ts",
+        "src/gateway/timeout.ts"
+      ]
+    },
+    {
+      "id": "PR-080",
+      "number": 80,
+      "url": "https://github.com/argon/synthetic-demo/pull/80",
+      "state": "merged"
+    },
+    {
+      "id": "PR-089",
+      "number": 89,
+      "url": "https://github.com/argon/synthetic-demo/pull/89",
+      "state": "merged",
+      "title": "Bypass optimistic lock in payment processing",
+      "merged_at": 1689600000,
+      "files": [
+        "src/billing/charge.ts",
+        "src/billing/ledger.ts"
+      ]
+    },
+    {
+      "id": "PR-124",
+      "number": 124,
+      "url": "https://github.com/argon/synthetic-demo/pull/124",
+      "state": "merged"
+    }
+  ],
+  "authored": [
+    {
+      "author_id": "person-alice",
+      "pr_id": "PR-033"
+    },
+    {
+      "author_id": "person-alice",
+      "pr_id": "PR-039"
+    },
+    {
+      "author_id": "person-bob",
+      "pr_id": "PR-042"
+    },
+    {
+      "author_id": "person-dan",
+      "pr_id": "PR-051"
+    },
+    {
+      "author_id": "person-alice",
+      "pr_id": "PR-058"
+    },
+    {
+      "author_id": "person-carol",
+      "pr_id": "PR-065"
+    },
+    {
+      "author_id": "person-dan",
+      "pr_id": "PR-071"
+    },
+    {
+      "author_id": "person-bob",
+      "pr_id": "PR-076"
+    },
+    {
+      "author_id": "person-carol",
+      "pr_id": "PR-080"
+    },
+    {
+      "author_id": "person-alice",
+      "pr_id": "PR-089"
+    },
+    {
+      "author_id": "person-bob",
+      "pr_id": "PR-124"
+    }
+  ],
+  "reviewed": [
+    {
+      "reviewer_id": "person-bob",
+      "pr_id": "PR-033",
+      "state": "APPROVED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "person-dan",
+      "pr_id": "PR-033",
+      "state": "APPROVED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "person-bob",
+      "pr_id": "PR-039",
+      "state": "APPROVED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "person-carol",
+      "pr_id": "PR-039",
+      "state": "APPROVED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "person-alice",
+      "pr_id": "PR-042",
+      "state": "APPROVED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "person-carol",
+      "pr_id": "PR-042",
+      "state": "APPROVED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "person-alice",
+      "pr_id": "PR-051",
+      "state": "APPROVED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "person-bob",
+      "pr_id": "PR-051",
+      "state": "APPROVED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "person-bob",
+      "pr_id": "PR-058",
+      "state": "APPROVED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "person-dan",
+      "pr_id": "PR-065",
+      "state": "APPROVED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "person-carol",
+      "pr_id": "PR-071",
+      "state": "APPROVED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "person-carol",
+      "pr_id": "PR-076",
+      "state": "APPROVED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "person-dan",
+      "pr_id": "PR-076",
+      "state": "APPROVED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "person-bob",
+      "pr_id": "PR-080",
+      "state": "APPROVED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "person-dan",
+      "pr_id": "PR-089",
+      "state": "APPROVED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "person-alice",
+      "pr_id": "PR-124",
+      "state": "APPROVED",
+      "count": 1
+    },
+    {
+      "reviewer_id": "person-dan",
+      "pr_id": "PR-124",
+      "state": "APPROVED",
+      "count": 1
+    }
+  ],
+  "issues": [
+    {
+      "id": "issue_1042",
+      "number": 1042,
+      "title": "Retry storm on payment gateway timeout (incident)",
+      "state": "closed",
+      "url": "https://github.com/argon/synthetic-demo/issues/1042",
+      "created_at": 1685900000,
+      "closed_by": [
+        "PR-042"
+      ]
+    },
+    {
+      "id": "issue_977",
+      "number": 977,
+      "title": "Sessions invalidated after Redis failover",
+      "state": "closed",
+      "url": "https://github.com/argon/synthetic-demo/issues/977",
+      "created_at": 1686900000,
+      "closed_by": [
+        "PR-058"
+      ]
+    },
+    {
+      "id": "issue_1120",
+      "number": 1120,
+      "title": "Sync queue memory grows without bound under backpressure",
+      "state": "closed",
+      "url": "https://github.com/argon/synthetic-demo/issues/1120",
+      "created_at": 1687900000,
+      "closed_by": [
+        "PR-071"
+      ]
+    },
+    {
+      "id": "issue_1188",
+      "number": 1188,
+      "title": "False 504s on slow upstream responses",
+      "state": "closed",
+      "url": "https://github.com/argon/synthetic-demo/issues/1188",
+      "created_at": 1688900000,
+      "closed_by": [
+        "PR-080"
+      ]
+    },
+    {
+      "id": "issue_1201",
+      "number": 1201,
+      "title": "Add jitter to the billing client retry delay",
+      "state": "open",
+      "url": "https://github.com/argon/synthetic-demo/issues/1201",
+      "created_at": 1689900000
+    }
+  ],
+  "owners": [
+    {
+      "owner_id": "@synthetic-demo/payments",
+      "kind": "team",
+      "name": "payments",
+      "component": "billing",
+      "pattern": "/src/billing/",
+      "coverage": 1.0
+    },
+    {
+      "owner_id": "@synthetic-demo/platform",
+      "kind": "team",
+      "name": "platform",
+      "component": "auth",
+      "pattern": "/src/auth/",
+      "coverage": 1.0
+    },
+    {
+      "owner_id": "@synthetic-demo/platform",
+      "kind": "team",
+      "name": "platform",
+      "component": "api-gateway",
+      "pattern": "/src/gateway/",
+      "coverage": 1.0
+    },
+    {
+      "owner_id": "person-carol",
+      "kind": "person",
+      "component": "sync",
+      "pattern": "/src/sync/",
+      "coverage": 1.0
     }
   ]
 }

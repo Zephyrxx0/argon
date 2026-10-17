@@ -16,6 +16,8 @@ export interface SeedDecision {
   source_url?: string;
   component: string;
   supersedes?: string | null;
+  /** Id of the pull request this decision was extracted from -> (Decision)-[:EXTRACTED_FROM]->(PullRequest). */
+  extracted_from?: string | null;
   embedding: number[];
 }
 
@@ -44,6 +46,45 @@ export interface SeedDependsOn {
   count: number;
 }
 
+/** Metadata (and touched files) for a pull request node; created when it does not exist yet. */
+export interface SeedPullRequest {
+  id: string;
+  number?: number;
+  title?: string;
+  url?: string;
+  state?: string;
+  merged_at?: number;
+  files?: string[];
+}
+
+export interface SeedReviewed {
+  reviewer_id: string;
+  pr_id: string;
+  state?: string;
+  count?: number;
+}
+
+export interface SeedIssue {
+  id: string;
+  number: number;
+  title: string;
+  state: 'open' | 'closed';
+  url?: string;
+  created_at: number;
+  /** Pull request ids that close the issue -> (PullRequest)-[:CLOSES]->(Issue). */
+  closed_by?: string[];
+}
+
+/** Owner of record from CODEOWNERS -> (Person|Team)-[:OWNS]->(Component). */
+export interface SeedOwner {
+  owner_id: string;
+  kind: 'person' | 'team';
+  name?: string;
+  component: string;
+  pattern: string;
+  coverage?: number;
+}
+
 export interface SeedData {
   workspaceId: string;
   components: Array<{ name: string }>;
@@ -53,6 +94,10 @@ export interface SeedData {
   persons?: SeedPerson[];
   authored?: SeedAuthored[];
   dependsOn?: SeedDependsOn[];
+  pullRequests?: SeedPullRequest[];
+  reviewed?: SeedReviewed[];
+  issues?: SeedIssue[];
+  owners?: SeedOwner[];
 }
 
 /**
@@ -221,7 +266,8 @@ export async function seedWorkspace(
       client,
       workspaceId,
       `UNWIND $batch AS p
-       MERGE (:Person {id: p.id, name: p.name})`,
+       MERGE (person:Person {id: p.id})
+       SET person.name = p.name, person.display_name = p.name`,
       data.persons
     );
   }
@@ -237,6 +283,143 @@ export async function seedWorkspace(
        MERGE (p)-[:AUTHORED]->(pr)`,
       data.authored
     );
+  }
+
+  // 7b. Pull request metadata (+ files they touched). Merged by id, so the revert nodes created in
+  //     step 5 keep their titles; numbers are unique per PullRequest.
+  if (data.pullRequests && data.pullRequests.length > 0) {
+    await runBatched(
+      client,
+      workspaceId,
+      `UNWIND $batch AS p
+       MERGE (pr:PullRequest {id: p.id})
+       SET pr.number = p.number,
+           pr.url = p.url,
+           pr.state = p.state,
+           pr.title = coalesce(p.title, pr.title),
+           pr.merged_at = coalesce(p.merged_at, pr.merged_at),
+           pr.is_revert = coalesce(pr.is_revert, false)`,
+      data.pullRequests.map((p) => ({
+        id: p.id,
+        number: p.number ?? null,
+        url: p.url ?? null,
+        state: p.state ?? null,
+        title: p.title ?? null,
+        merged_at: p.merged_at ?? null,
+      }))
+    );
+
+    const touches = data.pullRequests.flatMap((p) =>
+      (p.files ?? []).map((path) => ({ prId: p.id, path }))
+    );
+    if (touches.length > 0) {
+      await runBatched(
+        client,
+        workspaceId,
+        `UNWIND $batch AS item
+         MATCH (pr:PullRequest {id: item.prId})
+         MATCH (f:File {path: item.path})
+         MERGE (pr)-[:TOUCHES]->(f)`,
+        touches
+      );
+    }
+  }
+
+  // 7c. Reviews: (Person)-[:REVIEWED]->(PullRequest)
+  if (data.reviewed && data.reviewed.length > 0) {
+    await runBatched(
+      client,
+      workspaceId,
+      `UNWIND $batch AS r
+       MATCH (p:Person {id: r.reviewer_id})
+       MATCH (pr:PullRequest {id: r.pr_id})
+       MERGE (p)-[e:REVIEWED]->(pr)
+       SET e.state = r.state, e.count = r.count`,
+      data.reviewed.map((r) => ({ ...r, state: r.state ?? 'APPROVED', count: r.count ?? 1 }))
+    );
+  }
+
+  // 7d. Issues, (PullRequest)-[:CLOSES]->(Issue) and the derived (Issue)-[:AFFECTS]->(Component)
+  if (data.issues && data.issues.length > 0) {
+    await runBatched(
+      client,
+      workspaceId,
+      `UNWIND $batch AS i
+       MERGE (issue:Issue {id: i.id})
+       SET issue.number = i.number,
+           issue.title = i.title,
+           issue.state = i.state,
+           issue.url = i.url,
+           issue.created_at = i.created_at`,
+      data.issues.map((i) => ({
+        id: i.id,
+        number: i.number,
+        title: i.title,
+        state: i.state,
+        url: i.url ?? null,
+        created_at: i.created_at,
+      }))
+    );
+
+    const closes = data.issues.flatMap((i) =>
+      (i.closed_by ?? []).map((prId) => ({ prId, issueId: i.id }))
+    );
+    if (closes.length > 0) {
+      await runBatched(
+        client,
+        workspaceId,
+        `UNWIND $batch AS c
+         MATCH (pr:PullRequest {id: c.prId})
+         MATCH (issue:Issue {id: c.issueId})
+         MERGE (pr)-[:CLOSES]->(issue)`,
+        closes
+      );
+      await client.query(
+        workspaceId,
+        `MATCH (issue:Issue)<-[:CLOSES]-(pr:PullRequest)-[:TOUCHES]->(f:File)-[:IN_COMPONENT]->(c:Component)
+         WITH issue, c, count(DISTINCT f) AS files
+         MERGE (issue)-[r:AFFECTS]->(c)
+         SET r.files = files`
+      );
+    }
+  }
+
+  // 7e. Provenance: (Decision)-[:EXTRACTED_FROM]->(PullRequest)
+  const extracted = (data.decisions ?? [])
+    .filter((d) => d.extracted_from && d.extracted_from.trim().length > 0)
+    .map((d) => ({ decisionId: d.id, prId: d.extracted_from! }));
+  if (extracted.length > 0) {
+    await runBatched(
+      client,
+      workspaceId,
+      `UNWIND $batch AS e
+       MATCH (d:Decision {id: e.decisionId})
+       MATCH (pr:PullRequest {id: e.prId})
+       MERGE (d)-[:EXTRACTED_FROM]->(pr)`,
+      extracted
+    );
+  }
+
+  // 7f. Owners of record (CODEOWNERS)
+  if (data.owners && data.owners.length > 0) {
+    const teams = data.owners.filter((o) => o.kind === 'team');
+    const people = data.owners.filter((o) => o.kind === 'person');
+    await runBatched(
+      client,
+      workspaceId,
+      `UNWIND $batch AS o
+       MERGE (t:Team {id: o.owner_id})
+       SET t.name = coalesce(o.name, o.owner_id)`,
+      teams
+    );
+    const edge = (label: 'Team' | 'Person') =>
+      `UNWIND $batch AS o
+       MATCH (owner:${label} {id: o.owner_id})
+       MATCH (c:Component {name: o.component})
+       MERGE (owner)-[r:OWNS]->(c)
+       SET r.pattern = o.pattern, r.coverage = o.coverage`;
+    await runBatched(client, workspaceId, edge('Team'), teams.map((o) => ({ ...o, coverage: o.coverage ?? 1 })));
+    await runBatched(client, workspaceId, edge('Person'), people.map((o) => ({ ...o, coverage: o.coverage ?? 1 })));
   }
 
   // 8. DependsOn edges (if present in seed)
