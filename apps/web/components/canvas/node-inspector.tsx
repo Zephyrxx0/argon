@@ -61,17 +61,17 @@ export function NodeInspector({ node, onClose, className }: NodeInspectorProps) 
     <div
       data-testid="node-inspector-popover"
       className={clsx(
-        'absolute top-4 left-4 z-30 max-w-sm w-72 border border-accent/60 bg-card/95 backdrop-blur-md shadow-[0_0_20px_rgba(0,240,255,0.2)] font-mono p-4 space-y-3 animate-in fade-in zoom-in-95 duration-150',
+        'absolute top-4 left-4 z-30 max-w-sm w-80 border border-white bg-black font-mono p-4 space-y-3 ',
         className
       )}
     >
       {/* Header Bar */}
-      <div className="flex items-center justify-between border-b border-border/80 pb-2">
-        <div className="flex items-center gap-1.5">
-          <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-accent border border-accent/40 bg-accent/10">
+      <div className="flex items-center justify-between gap-2 border-b border-border/80 pb-2">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-accent border border-accent/40 bg-accent/10">
             {node.type}
           </span>
-          <span className="text-[11px] font-mono text-muted-foreground">
+          <span className="truncate text-[11px] font-mono text-muted-foreground" title={cleanId}>
             #{cleanId}
           </span>
         </div>
@@ -79,7 +79,7 @@ export function NodeInspector({ node, onClose, className }: NodeInspectorProps) 
           type="button"
           onClick={onClose}
           data-testid="close-inspector-button"
-          className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+          className="shrink-0 p-0.5 text-muted-foreground hover:text-foreground transition-colors"
         >
           <X className="w-3.5 h-3.5" />
         </button>
@@ -88,15 +88,15 @@ export function NodeInspector({ node, onClose, className }: NodeInspectorProps) 
       {/* Node Title / Label & Contributor Profile */}
       <div className="space-y-2">
         {isPerson && isLinked ? (
-          <div className="flex items-start gap-2.5 p-2 border border-accent/30 bg-accent/5 rounded-sm">
+          <div className="flex items-start gap-2.5 p-2 border border-accent/30 bg-accent/5 ">
             {avatarUrl ? (
               <img
                 src={avatarUrl}
                 alt={node.label}
-                className="w-8 h-8 rounded-full border border-accent/50 object-cover shrink-0"
+                className="w-8 h-8 border border-accent/50 object-cover shrink-0"
               />
             ) : (
-              <div className="w-8 h-8 rounded-full border border-border bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0">
+              <div className="w-8 h-8 border border-border bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0">
                 <User className="w-4 h-4 text-accent" />
               </div>
             )}
@@ -108,7 +108,7 @@ export function NodeInspector({ node, onClose, className }: NodeInspectorProps) 
                 {isYou && (
                   <span
                     data-testid="node-inspector-you-badge"
-                    className="bg-accent/20 text-accent border border-accent/40 font-mono text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0"
+                    className="bg-accent/20 text-accent border border-accent/40 font-mono text-[9px] font-bold px-1.5 py-0.2  shrink-0"
                   >
                     YOU
                   </span>
@@ -148,7 +148,7 @@ export function NodeInspector({ node, onClose, className }: NodeInspectorProps) 
             {isPerson && isYou && (
               <span
                 data-testid="node-inspector-you-badge"
-                className="bg-accent/20 text-accent border border-accent/40 font-mono text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0"
+                className="bg-accent/20 text-accent border border-accent/40 font-mono text-[9px] font-bold px-1.5 py-0.2  shrink-0"
               >
                 YOU
               </span>
@@ -159,11 +159,11 @@ export function NodeInspector({ node, onClose, className }: NodeInspectorProps) 
 
       {/* Properties List */}
       {node.properties && Object.keys(node.properties).length > 0 && (
-        <div className="space-y-1 pt-1 border-t border-border/40 max-h-36 overflow-y-auto text-[10px]">
+        <div className="space-y-1 pt-1 border-t border-border/40 max-h-56 overflow-y-auto text-[11px]">
           {Object.entries(node.properties).map(([key, val]) => (
             <div key={key} className="flex items-start justify-between gap-2 py-0.5">
-              <span className="text-muted-foreground shrink-0">{key}:</span>
-              <span className="text-foreground truncate max-w-[140px] font-mono">
+              <span className="text-muted-foreground shrink-0 max-w-[40%] truncate" title={key}>{key}:</span>
+              <span className="text-foreground break-words text-right min-w-0 font-mono">
                 {String(val)}
               </span>
             </div>
