@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import { SplitViewport } from '@/components/layout/split-viewport';
 import { ShowcaseHub } from '@/components/hub/showcase-hub';
 import { BriefingView, type WebBriefingResponse } from '@/components/briefing/briefing-view';
@@ -15,16 +16,20 @@ import {
 import { GraphCanvas } from '@/components/graph/graph-canvas';
 import { useWorkspaceResource } from '@/lib/use-workspace-resource';
 import { buildSuggestions } from '@/lib/scenarios';
-import type { OverviewResponse } from '@/lib/workspace-data';
+import type { FileGraphResponse, GraphView, OverviewResponse } from '@/lib/workspace-data';
 import { InsightPane } from '@/components/workspace/insight-pane';
 import { type Workspace } from '@/components/workspace/workspace-switcher';
 import type { GraphElements } from '@/lib/graph/model';
+
+const FILES_VIEW_QUERY = { view: 'files' } as const;
 
 export default function WorkspacePage() {
   const { getToken, activeWorkspace, setActiveWorkspace, user } = useAuth();
   const [selectedTask, setSelectedTask] = useState<string>('');
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>(activeWorkspace || 'ember-adr-showcase');
   const [currentContributorId, setCurrentContributorId] = useState<string | null>(null);
+  // Which graph the canvas shows when there is no briefing: architecture overview or file co-change
+  const [graphView, setGraphView] = useState<GraphView>('overview');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   // A briefing belongs to the workspace it was generated for; it is never shown for another one.
@@ -92,6 +97,7 @@ export default function WorkspacePage() {
     setError(null);
     setSelectedTask('');
     setCurrentContributorId(null);
+    setGraphView('overview');
   }, [currentWorkspaceId]);
 
   useEffect(() => () => inFlightRef.current?.abort(), []);
@@ -177,6 +183,16 @@ export default function WorkspacePage() {
         setIsLoading(false);
       }
     }
+  };
+
+  // Leaves the briefing: cancels a running one and returns to the showcase hub + workspace graph
+  const clearBriefing = () => {
+    inFlightRef.current?.abort();
+    inFlightRef.current = null;
+    setBriefingState(null);
+    setIsLoading(false);
+    setError(null);
+    setSelectedTask('');
   };
 
   const handleSelectScenario = (query: string) => {
@@ -303,25 +319,51 @@ export default function WorkspacePage() {
     return nodes.length > 0 ? { nodes, edges } : null;
   }, [briefingResponse]);
 
+  // A finished re-sync changes the graph under the same workspace id: bump a counter so the
+  // overview / files / contributors resources are fetched again.
+  const [resyncVersion, setResyncVersion] = useState(0);
+  const resourceIdentity = `${user?.id ?? ''}#${resyncVersion}`;
+
   // Without a (graphable) briefing the canvas shows this workspace's own architecture overview
   const overview = useWorkspaceResource<OverviewResponse>(
     currentWorkspaceId,
     'overview',
     getToken,
     true,
-    user?.id ?? null
+    resourceIdentity
   );
+  // The Files view is only requested once it is selected
+  const fileGraph = useWorkspaceResource<FileGraphResponse>(
+    currentWorkspaceId,
+    'overview',
+    getToken,
+    graphView === 'files',
+    resourceIdentity,
+    FILES_VIEW_QUERY
+  );
+  const activeGraph = graphView === 'files' ? fileGraph : overview;
   const graphElements: GraphElements | null =
-    canvasElements ?? (overview.status === 'ready' ? overview.data.elements : null);
+    canvasElements ?? (activeGraph.status === 'ready' ? activeGraph.data.elements : null);
   const graphStatus =
-    overview.status === 'loading'
+    activeGraph.status === 'loading'
       ? ({ kind: 'loading' } as const)
-      : overview.status === 'error'
+      : activeGraph.status === 'error'
         ? ({
             kind: 'error',
-            message: overview.code === 503 ? 'No graph, no answer' : overview.message,
+            message: activeGraph.code === 503 ? 'No graph, no answer' : activeGraph.message,
           } as const)
-        : ({ kind: 'empty', message: 'No components indexed for this workspace' } as const);
+        : ({
+            kind: 'empty',
+            message:
+              graphView === 'files'
+                ? 'No co-change relationships found. Re-ingest the repository to mine them'
+                : 'No components indexed for this workspace',
+          } as const);
+  const fileStats = fileGraph.status === 'ready' ? fileGraph.data.stats : null;
+  const viewNote =
+    !canvasElements && graphView === 'files' && fileStats && fileStats.files > 0
+      ? `Edges = files changed together (N× commits) · ${fileStats.files}/${fileStats.totalFiles} files, ${fileStats.edges}/${fileStats.totalEdges} links`
+      : undefined;
 
   // Example queries, scenario cards and palette entries all come from this workspace's own graph
   const suggestions = useMemo(
@@ -354,6 +396,8 @@ export default function WorkspacePage() {
           currentWorkspaceId={currentWorkspaceId}
           onSelectWorkspace={handleSelectWorkspace}
           onIngestSuccess={handleIngestSuccess}
+          onResyncComplete={() => setResyncVersion((v) => v + 1)}
+          resyncVersion={resyncVersion}
           currentContributorId={currentContributorId}
           onSelectContributor={setCurrentContributorId}
         />
@@ -363,14 +407,42 @@ export default function WorkspacePage() {
           <SplitViewport
             defaultLayout={uiPreferences.split_viewport_sizes || [45, 55]}
             leftPanel={
-              <div className="h-full bg-background">
+              <div
+                className="h-full bg-background"
+                style={
+                  isLoading || briefingResponse
+                    ? ({ '--briefing-bar-h': '2.5rem' } as React.CSSProperties)
+                    : undefined
+                }
+              >
                 {isLoading || briefingResponse ? (
-                  <BriefingView
-                    response={briefingResponse}
-                    isLoading={isLoading}
-                    onRetryConnection={handleRetryConnection}
-                    onSelectWorkspace={handleSelectWorkspace}
-                  />
+                  <>
+                    <div
+                      data-testid="briefing-back-bar"
+                      className="sticky top-0 z-30 flex h-10 items-center gap-3 border-b border-border bg-background/95 px-3 font-mono backdrop-blur-md"
+                    >
+                      <button
+                        type="button"
+                        onClick={clearBriefing}
+                        data-testid="briefing-back-btn"
+                        className="inline-flex shrink-0 items-center gap-1.5 border border-border/60 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:border-foreground hover:bg-foreground hover:text-background"
+                      >
+                        <ArrowLeft className="h-3 w-3" aria-hidden="true" />
+                        <span>Back to overview</span>
+                      </button>
+                      {selectedTask && (
+                        <span className="min-w-0 truncate text-[11px] text-muted-foreground" title={selectedTask}>
+                          {selectedTask}
+                        </span>
+                      )}
+                    </div>
+                    <BriefingView
+                      response={briefingResponse}
+                      isLoading={isLoading}
+                      onRetryConnection={handleRetryConnection}
+                      onSelectWorkspace={handleSelectWorkspace}
+                    />
+                  </>
                 ) : (
                   <ShowcaseHub
                     onSelectScenario={handleSelectScenario}
@@ -392,6 +464,10 @@ export default function WorkspacePage() {
                     key={currentWorkspaceId}
                     elements={graphElements}
                     status={canvasElements ? undefined : graphStatus}
+                    // a briefing's own evidence graph replaces both views, so no toggle then
+                    view={canvasElements ? undefined : graphView}
+                    onViewChange={canvasElements ? undefined : setGraphView}
+                    viewNote={viewNote}
                   />
                 }
               />
