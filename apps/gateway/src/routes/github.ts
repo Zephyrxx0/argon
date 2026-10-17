@@ -3,8 +3,18 @@ import type { ArgonGraphClient } from '@argon/graph';
 import { checkWorkspaceAccess, setUserWorkspaceAccess } from '@argon/graph';
 import { randomUUID } from 'node:crypto';
 import { IngestLimiter, effectiveJob, parsePublicRepoUrl, publicWorkspaceId } from '../services/public-ingest.js';
-import type { GitHubAppService } from '../services/github-app.js';
+import { GitHubUserService } from '../services/github-user.js';
 import { ErrorCodes, type GatewayErrorResponse, type JwtAuthUser } from '../types.js';
+
+/** Reads the user's GitHub OAuth token off the verified JWT (set by the web app's jwt plugin). */
+function userToken(user: JwtAuthUser | undefined): string | undefined {
+  return (
+    (user as any)?.userAccessToken ||
+    (user as any)?.githubAccessToken ||
+    (user as any)?.accessToken ||
+    undefined
+  );
+}
 
 export interface PublicIngestParams {
   repoUrl: string;
@@ -16,162 +26,172 @@ export interface PublicIngestParams {
   release: () => void;
 }
 
+export interface PrivateIngestParams {
+  repoUrl: string;
+  repositoryFullName: string;
+  /** The caller's GitHub OAuth token, used to clone the (possibly private) repo. */
+  accessToken: string;
+  workspaceId: string;
+  jobId: string;
+  userId: string;
+  userLogin?: string;
+  userEmails?: string[];
+  release: () => void;
+}
+
 export interface GitHubRouteOptions {
   onIngestPublic?: (params: PublicIngestParams) => Promise<void> | void;
+  onIngest?: (params: PrivateIngestParams) => Promise<void> | void;
   ingestLimiter?: IngestLimiter;
-  onIngest?: (params: {
-    repositoryFullName: string;
-    installationId: number;
-    installationToken: string;
-    workspaceId: string;
-    userId: string;
-    userLogin?: string;
-    userEmails?: string[];
-  }) => Promise<void> | void;
 }
 
 export function githubRoute(
-  githubAppService: GitHubAppService,
+  githubUserService: GitHubUserService,
   graphClient?: ArgonGraphClient,
   options?: GitHubRouteOptions
 ): Hono {
   const router = new Hono();
+  const limiter = options?.ingestLimiter ?? new IngestLimiter();
 
   /**
-   * GET /repositories - Lists accessible repositories for the authenticated user (D-09, D-10)
+   * GET /repositories - every repository the signed-in user can access (public + private,
+   * personal + org), listed with their own OAuth token. No GitHub App installation required.
    */
   router.get('/repositories', async (c) => {
     const user = (c.get as any)('user') as JwtAuthUser | undefined;
-
     if (!user || user.isAnonymous) {
-      const errorResponse: GatewayErrorResponse = {
-        error: 'Authentication required to list private repositories',
-        code: ErrorCodes.UNAUTHORIZED,
-      };
-      return c.json(errorResponse, 401);
+      return c.json<GatewayErrorResponse>(
+        { error: 'Authentication required to list your repositories', code: ErrorCodes.UNAUTHORIZED },
+        401
+      );
+    }
+    const token = userToken(user);
+    if (!token) {
+      return c.json<GatewayErrorResponse>(
+        {
+          error: 'No GitHub access token on your session. Sign in with GitHub to list your repositories.',
+          code: ErrorCodes.UNAUTHORIZED,
+        },
+        401
+      );
     }
 
     try {
-      const installationIdParam = c.req.query('installationId');
-      const targetInstallationId = installationIdParam ? Number(installationIdParam) : undefined;
-      const userAccessToken =
-        (user as any).userAccessToken || (user as any).githubAccessToken || (user as any).accessToken;
-      const login = ((user as any).login || (user as any).userLogin || (user as any).name) as
-        | string
-        | undefined;
-
-      const repositories = await githubAppService.getUserRepositories(
-        userAccessToken,
-        targetInstallationId,
-        login
-      );
-
+      const repositories = await githubUserService.listUserRepositories(token);
       return c.json({ repositories });
     } catch (err: any) {
-      const errorResponse: GatewayErrorResponse = {
-        error: err?.message || 'Failed to list GitHub repositories',
-        code: ErrorCodes.INTERNAL_ERROR,
-      };
-      return c.json(errorResponse, 500);
+      const status = err?.status === 401 ? 401 : 500;
+      return c.json<GatewayErrorResponse>(
+        {
+          error: err?.message || 'Failed to list GitHub repositories',
+          code: status === 401 ? ErrorCodes.UNAUTHORIZED : ErrorCodes.INTERNAL_ERROR,
+        },
+        status
+      );
     }
   });
 
   /**
-   * POST /ingest - Dispatches authenticated private repository ingestion with dual verification (D-04, T-07-04)
+   * POST /ingest - Ingest one of the caller's own repositories (public or private) using their
+   * OAuth token to clone. Authorization = the user's token can read the repo.
    */
   router.post('/ingest', async (c) => {
     const user = (c.get as any)('user') as JwtAuthUser | undefined;
-
-    if (!user || user.isAnonymous) {
-      const errorResponse: GatewayErrorResponse = {
-        error: 'Authentication required to initiate ingestion',
-        code: ErrorCodes.UNAUTHORIZED,
-      };
-      return c.json(errorResponse, 401);
+    if (!user?.userId || user.isAnonymous) {
+      return c.json<GatewayErrorResponse>(
+        { error: 'Authentication required to initiate ingestion', code: ErrorCodes.UNAUTHORIZED },
+        401
+      );
     }
 
     let body: any;
     try {
       body = await c.req.json();
     } catch {
-      const errorResponse: GatewayErrorResponse = {
-        error: 'Malformed JSON payload',
-        code: ErrorCodes.VALIDATION_ERROR,
-      };
-      return c.json(errorResponse, 400);
+      return c.json<GatewayErrorResponse>(
+        { error: 'Malformed JSON payload', code: ErrorCodes.VALIDATION_ERROR },
+        400
+      );
     }
 
-    if (!body || typeof body.repositoryFullName !== 'string' || typeof body.installationId !== 'number') {
-      const errorResponse: GatewayErrorResponse = {
-        error: 'Missing required parameters: repositoryFullName (string) and installationId (number)',
-        code: ErrorCodes.VALIDATION_ERROR,
-      };
-      return c.json(errorResponse, 400);
+    const repositoryFullName = typeof body?.repositoryFullName === 'string' ? body.repositoryFullName.trim() : '';
+    const parts = repositoryFullName.split('/');
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
+      return c.json<GatewayErrorResponse>(
+        { error: 'repositoryFullName must be "owner/repo"', code: ErrorCodes.VALIDATION_ERROR },
+        400
+      );
+    }
+    const [owner, repo] = parts as [string, string];
+
+    const token = userToken(user);
+    if (!token || !graphClient || !options?.onIngest) {
+      return c.json<GatewayErrorResponse>(
+        {
+          error: !token
+            ? 'No GitHub access token on your session. Sign in with GitHub first.'
+            : 'Ingestion is not available on this gateway',
+          code: !token ? ErrorCodes.UNAUTHORIZED : ErrorCodes.INTERNAL_ERROR,
+        },
+        !token ? 401 : 503
+      );
     }
 
-    const { repositoryFullName, installationId } = body;
-    const userAccessToken =
-      (user as any).userAccessToken || (user as any).githubAccessToken || (user as any).accessToken;
-
-    // Dual Authorization verification check (D-04, T-07-04)
-    const isAuthorized = await githubAppService.verifyUserInstallation(
-      user.userId,
-      installationId,
-      userAccessToken
-    );
-
-    if (!isAuthorized) {
-      const errorResponse: GatewayErrorResponse = {
-        error: 'User is not authorized for this GitHub App installation',
-        code: ErrorCodes.FORBIDDEN,
-      };
-      return c.json(errorResponse, 403);
+    // Authorize by access: the user's token must be able to read the repo (so it is cloneable).
+    const meta = await githubUserService.getRepository(token, owner, repo);
+    if (!meta) {
+      return c.json<GatewayErrorResponse>(
+        { error: `Repository '${repositoryFullName}' not found or not accessible with your GitHub account`, code: ErrorCodes.NOT_FOUND },
+        404
+      );
     }
+
+    const slot = limiter.tryAcquire(user.userId);
+    if ('reason' in slot) {
+      return c.json<GatewayErrorResponse>(
+        {
+          error:
+            slot.reason === 'user'
+              ? 'You already have an ingestion in progress. Wait for it to finish.'
+              : 'The server is busy ingesting other repositories. Try again shortly.',
+          code: ErrorCodes.RATE_LIMITED,
+        },
+        429
+      );
+    }
+
+    const workspaceId = publicWorkspaceId(user.userId, owner, repo);
+    const jobId = `job_${randomUUID().slice(0, 8)}`;
 
     try {
-      // Mint short-lived installation token kept in-memory
-      const installationToken = await githubAppService.getInstallationToken(installationId);
-      const workspaceId = body.workspaceId || repositoryFullName.replace('/', '-').toLowerCase();
-
-      // Ensure FalkorDB workspace ownership & access records (TENANT-01, TENANT-02)
-      if (graphClient) {
-        await setUserWorkspaceAccess(graphClient, {
-          workspaceId,
-          userId: user.userId,
-          role: 'owner',
-          isPublic: false,
-        });
-      }
-
-      // Invoke async ingestion callback if wired
-      if (options?.onIngest) {
-        await options.onIngest({
-          repositoryFullName,
-          installationId,
-          installationToken,
-          workspaceId,
-          userId: user.userId,
-          userLogin: (user.login as string | undefined) || (user.userLogin as string | undefined),
-          userEmails: user.email ? [user.email as string] : undefined,
-        });
-      }
-
-      return c.json({
-        status: 'queued',
+      await setUserWorkspaceAccess(graphClient, {
         workspaceId,
-        repositoryFullName,
-        installationId,
+        userId: user.userId,
+        role: 'owner',
+        isPublic: false,
+      });
+
+      await options.onIngest({
+        repoUrl: meta.htmlUrl,
+        repositoryFullName: meta.fullName,
+        accessToken: token,
+        workspaceId,
+        jobId,
+        userId: user.userId,
+        userLogin: ((user as any).login || (user as any).userLogin || (user as any).name) as string | undefined,
+        userEmails: user.email ? [user.email as string] : undefined,
+        release: slot.release,
       });
     } catch (err: any) {
-      const errorResponse: GatewayErrorResponse = {
-        error: err?.message || 'Failed to dispatch repository ingestion',
-        code: ErrorCodes.INTERNAL_ERROR,
-      };
-      return c.json(errorResponse, 500);
+      slot.release();
+      return c.json<GatewayErrorResponse>(
+        { error: err?.message || 'Failed to start ingestion', code: ErrorCodes.INTERNAL_ERROR },
+        500
+      );
     }
-  });
 
-  const limiter = options?.ingestLimiter ?? new IngestLimiter();
+    return c.json({ status: 'queued', workspaceId, jobId, repositoryFullName: meta.fullName, private: meta.private }, 202);
+  });
 
   /**
    * POST /ingest-public - Starts ingestion of a PUBLIC github.com repository for the caller.

@@ -15,10 +15,6 @@ export function jwtAuthMiddleware(secretOverride?: string): MiddlewareHandler {
       ...new Set([secret, process.env.BETTER_AUTH_SECRET].filter((v): v is string => Boolean(v?.trim()))),
     ];
 
-    if (c.req.path.startsWith('/api/v1/webhooks')) {
-      return await next();
-    }
-
     if (!secret || secret.trim() === '') {
       const errorResponse: GatewayErrorResponse = {
         error: 'Server authentication unconfigured',

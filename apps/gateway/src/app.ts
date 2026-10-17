@@ -8,23 +8,18 @@ import { healthRoute } from './routes/health.js';
 import { queryRoute } from './routes/query.js';
 import { briefingRoute, type BriefingRouteOptions } from './routes/briefing.js';
 import { githubRoute, type GitHubRouteOptions } from './routes/github.js';
-import { GitHubAppService } from './services/github-app.js';
-import { webhooksRoute, type WebhooksRouteOptions } from './routes/webhooks.js';
+import { GitHubUserService } from './services/github-user.js';
 import { eventsRoute, type EventsRouteOptions } from './routes/events.js';
-import { IncrementalSyncService } from './services/incremental-sync.js';
-import { syncOrchestrator } from './services/sync-orchestrator.js';
+import { eventBroadcaster } from './services/event-broadcaster.js';
 import { runIngestion } from '@argon/ingest';
 
 export interface GatewayAppOptions {
   graphClient?: ArgonGraphClient;
   gatewaySecret?: string;
-  webhookSecret?: string;
   queryTimeoutMs?: number;
   briefingOptions?: BriefingRouteOptions;
-  githubAppService?: GitHubAppService;
+  githubUserService?: GitHubUserService;
   githubRouteOptions?: GitHubRouteOptions;
-  webhooksOptions?: WebhooksRouteOptions;
-  incrementalSyncService?: IncrementalSyncService;
   eventsOptions?: EventsRouteOptions;
 }
 
@@ -43,29 +38,35 @@ export function createGatewayApp(options?: GatewayAppOptions): Hono {
   // Authenticated API routes with HS256 JWT verification
   app.use('/api/*', jwtAuthMiddleware(options?.gatewaySecret));
 
-  // GitHub App repository and ingestion routes
-  const githubApp = options?.githubAppService ?? new GitHubAppService();
+  // GitHub repository + ingestion routes, backed by the user's own OAuth token (no App).
+  const githubUser = options?.githubUserService ?? new GitHubUserService();
 
-  const defaultOnIngest = async (payload: {
-    repositoryFullName: string;
-    installationId: number;
-    installationToken: string;
-    workspaceId: string;
-    userId: string;
-    userLogin?: string;
-    userEmails?: string[];
-  }) => {
+  // Ingest one of the user's own repos (public or private), cloning with their OAuth token.
+  const defaultOnIngest: NonNullable<GitHubRouteOptions['onIngest']> = (payload) => {
     runIngestion({
-      repoUrl: `https://github.com/${payload.repositoryFullName}`,
+      repoUrl: payload.repoUrl,
       workspaceId: payload.workspaceId,
-      installationToken: payload.installationToken,
+      jobId: payload.jobId,
+      accessToken: payload.accessToken,
       client: options?.graphClient,
       userId: payload.userId,
       userLogin: payload.userLogin,
       userEmails: payload.userEmails,
-    }).catch((err) => {
-      console.error(`[gateway:ingest] Ingestion failed for ${payload.repositoryFullName}:`, err);
-    });
+      depth: PUBLIC_INGEST_MAX_COMMITS,
+      maxCommits: PUBLIC_INGEST_MAX_COMMITS,
+    })
+      .then(() => {
+        // Keep the live-sync UI meaningful without webhooks: tell subscribers the graph changed.
+        eventBroadcaster.broadcast(payload.workspaceId, 'sync:complete', {
+          workspaceId: payload.workspaceId,
+          updated: { commits: [], files: [], decisions: [] },
+          superseded: [],
+        });
+      })
+      .catch((err) => {
+        console.error(`[gateway:ingest] Ingestion failed for ${payload.repositoryFullName}:`, err?.message ?? err);
+      })
+      .finally(payload.release);
   };
 
   // Public-repo ingestion is bounded: recent history only, so a huge repository cannot
@@ -80,6 +81,13 @@ export function createGatewayApp(options?: GatewayAppOptions): Hono {
       depth: PUBLIC_INGEST_MAX_COMMITS,
       maxCommits: PUBLIC_INGEST_MAX_COMMITS,
     })
+      .then(() => {
+        eventBroadcaster.broadcast(payload.workspaceId, 'sync:complete', {
+          workspaceId: payload.workspaceId,
+          updated: { commits: [], files: [], decisions: [] },
+          superseded: [],
+        });
+      })
       .catch((err) => {
         console.error(`[gateway:ingest] Public ingestion failed for ${payload.repositoryFullName}:`, err?.message ?? err);
       })
@@ -91,27 +99,9 @@ export function createGatewayApp(options?: GatewayAppOptions): Hono {
     onIngestPublic: options?.githubRouteOptions?.onIngestPublic ?? defaultOnIngestPublic,
     ...options?.githubRouteOptions,
   };
-  const ghRoute = githubRoute(githubApp, options?.graphClient, githubRouteOptions);
+  const ghRoute = githubRoute(githubUser, options?.graphClient, githubRouteOptions);
   app.route('/api/v1/github', ghRoute);
   app.route('/api/v1/workspaces', ghRoute);
-
-  // Webhook receiver routes and sync runner
-  const incrementalSync =
-    options?.incrementalSyncService ??
-    new IncrementalSyncService({
-      graphClient: options?.graphClient,
-      githubAppService: githubApp,
-    });
-  syncOrchestrator.registerRunner((jobId, event, payload, workspaceId) =>
-    incrementalSync.sync(jobId, event, payload, workspaceId),
-  );
-
-  const whRoute = webhooksRoute({
-    graphClient: options?.graphClient,
-    webhookSecret: options?.webhookSecret,
-    ...options?.webhooksOptions,
-  });
-  app.route('/api/v1/webhooks', whRoute);
 
   // Pre-query tenant authorization guard under /api/v1
   if (options?.graphClient) {
