@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
 import {
   GitBranch,
@@ -18,6 +18,12 @@ import type { Workspace } from './workspace-switcher';
 import { RepoPicker, type GitHubRepositoryItem } from './repo-picker';
 import { useAuth } from '@/app/providers';
 import { AuthModal } from '@/components/auth/auth-modal';
+import {
+  startPrivateIngest,
+  startPublicIngest,
+  stepIndexForStatus,
+  waitForIngest,
+} from '@/lib/ingest-client';
 
 export interface IngestModalProps {
   open: boolean;
@@ -34,7 +40,7 @@ export interface IngestStep {
 }
 
 const INGEST_STEPS: IngestStep[] = [
-  { id: 'cloning', label: 'CLONING', detail: 'Authenticated shallow git clone with credential scrubbing' },
+  { id: 'cloning', label: 'CLONING', detail: 'Blobless git clone of recent history with credential scrubbing' },
   { id: 'mining', label: 'DERIVING', detail: 'Co-change matrix analysis & architectural clustering' },
   { id: 'decisions', label: 'EMBEDDING', detail: 'Mining ADR/RFC decisions & 512-d Matryoshka vectors' },
   { id: 'ready', label: 'READY', detail: 'Writing GraphBLAS topological nodes to FalkorDB instance' },
@@ -120,58 +126,54 @@ export function IngestModal({
     }
   };
 
-  // Launch simulated or live ingestion pipeline
-  const runPipeline = (repoFullName: string, targetUrl: string, installationId?: number) => {
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Cancel any in-flight start/poll when the modal closes or unmounts
+  useEffect(() => {
+    if (!open) abortRef.current?.abort();
+    return () => abortRef.current?.abort();
+  }, [open]);
+
+  // Start a real ingestion job on the gateway and follow it to completion.
+  const runPipeline = async (
+    repoFullName: string,
+    targetUrl: string,
+    installationId?: number
+  ) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setIsIngesting(true);
     setIngestError(null);
     setCurrentStepIndex(0);
 
-    // Call Gateway /api/v1/workspaces/ingest in background if installationId provided
-    if (installationId) {
-      getToken().then((token) => {
-        fetch('/api/v1/workspaces/ingest', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({
-            repositoryFullName: repoFullName,
-            installationId,
-          }),
-        }).catch(() => {
-          // Keep progress lifecycle responsive for user feedback
-        });
+    try {
+      const token = await getToken();
+      const started = installationId
+        ? await startPrivateIngest(repoFullName, installationId, token, controller.signal)
+        : await startPublicIngest(targetUrl, token, controller.signal);
+
+      const final = await waitForIngest(started.workspaceId, {
+        getToken,
+        signal: controller.signal,
+        onProgress: (st) => setCurrentStepIndex(stepIndexForStatus(st.status)),
       });
-    }
 
-    const timer1 = setTimeout(() => setCurrentStepIndex(1), 600);
-    const timer2 = setTimeout(() => setCurrentStepIndex(2), 1200);
-    const timer3 = setTimeout(() => setCurrentStepIndex(3), 1800);
-    const timer4 = setTimeout(() => {
+      setCurrentStepIndex(INGEST_STEPS.length - 1);
+      const newWorkspace: Workspace = {
+        id: started.workspaceId,
+        name: repoFullName,
+        repoUrl: targetUrl,
+        nodeCount: final.nodeCount,
+      };
       setIsIngesting(false);
-      try {
-        const segments = repoFullName.split('/').filter(Boolean);
-        const repoName = segments[segments.length - 1] || 'repository';
-        const newWorkspace: Workspace = {
-          id: `custom-${repoName.toLowerCase()}-${Date.now().toString(36)}`,
-          name: repoFullName,
-          repoUrl: targetUrl,
-          nodeCount: 142,
-        };
-        onIngestComplete(newWorkspace);
-        onOpenChange(false);
-      } catch {
-        onOpenChange(false);
-      }
-    }, 2400);
-
-    return () => {
-      clearTimeout(timer1);
-      clearTimeout(timer2);
-      clearTimeout(timer3);
-      clearTimeout(timer4);
-    };
+      onIngestComplete(newWorkspace);
+      onOpenChange(false);
+    } catch (err) {
+      if ((err as Error)?.name === 'AbortError') return;
+      setIngestError((err as Error)?.message || 'Ingestion failed');
+    }
   };
 
   // Trigger from RepoPicker selection
@@ -208,10 +210,10 @@ export function IngestModal({
         aria-modal="true"
         aria-label="Ingest Git Repository"
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/85 backdrop-blur-sm font-mono animate-in fade-in duration-150"
-        onClick={() => !isIngesting && onOpenChange(false)}
+        onClick={() => (!isIngesting || ingestError) && onOpenChange(false)}
       >
         <div
-          className="w-full max-w-xl border border-border bg-card shadow-[0_0_60px_rgba(0,0,0,0.85)] overflow-hidden"
+          className="w-full max-w-xl border border-border bg-card overflow-hidden"
           onClick={(e) => e.stopPropagation()}
           data-testid="ingest-modal"
         >
@@ -228,7 +230,7 @@ export function IngestModal({
                 Select an authorized GitHub repository or supply a public git repository URL.
               </p>
             </div>
-            {!isIngesting && (
+            {(!isIngesting || ingestError) && (
               <button
                 type="button"
                 onClick={() => onOpenChange(false)}
@@ -362,10 +364,17 @@ export function IngestModal({
               /* Active Ingestion Progress Display */
               <div className="space-y-5 py-2">
                 <div className="flex items-center justify-between text-xs">
+                  {ingestError ? (
+                    <span className="text-danger font-bold uppercase tracking-wider flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      <span>INGESTION FAILED</span>
+                    </span>
+                  ) : (
                   <span className="text-accent font-bold uppercase tracking-wider flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     <span>EXECUTING INGESTION PIPELINE...</span>
                   </span>
+                  )}
                   <span className="text-muted-foreground text-[11px]">
                     STEP {currentStepIndex + 1} OF {INGEST_STEPS.length}
                   </span>
@@ -399,6 +408,8 @@ export function IngestModal({
                         <div className="mt-0.5 shrink-0">
                           {isDone ? (
                             <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
+                          ) : isCurrent && ingestError ? (
+                            <AlertTriangle className="w-3.5 h-3.5 text-danger" />
                           ) : isCurrent ? (
                             <Loader2 className="w-3.5 h-3.5 text-accent animate-spin" />
                           ) : (
@@ -419,9 +430,29 @@ export function IngestModal({
                 </div>
 
                 {ingestError && (
-                  <div className="p-3 border border-destructive/40 bg-destructive/10 text-xs text-destructive flex items-start gap-2 break-words">
-                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span>{ingestError}</span>
+                  <div className="space-y-3">
+                    <div
+                      role="alert"
+                      data-testid="ingest-error"
+                      className="p-3 border border-danger/60 bg-danger/10 text-xs text-danger flex items-start gap-2 break-words"
+                    >
+                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>{ingestError}</span>
+                    </div>
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        data-testid="ingest-retry-button"
+                        onClick={() => {
+                          setIsIngesting(false);
+                          setIngestError(null);
+                          setCurrentStepIndex(0);
+                        }}
+                        className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider border border-border hover:bg-foreground hover:text-background transition-colors"
+                      >
+                        Back
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

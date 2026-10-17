@@ -79,6 +79,31 @@ const secretKey =
       })()
     : 'argon-dev-secret-at-least-32-chars-long');
 
+// Forward holder: the JWT sign callback (defined inside betterAuth below) needs to call back
+// into the configured auth instance to refresh OAuth tokens, which doesn't exist yet here.
+let authRef: { api: { getAccessToken: (args: { body: { accountId: string; userId: string } }) => Promise<unknown> } } | null =
+  null;
+
+/**
+ * Returns a currently-valid GitHub access token for a Better Auth account, transparently
+ * refreshing it with the stored refresh token when the current one has expired. Returns
+ * undefined on any failure (the caller then simply omits the token).
+ */
+async function getFreshGithubToken(
+  accountId: string,
+  userId: string
+): Promise<string | undefined> {
+  try {
+    const res = await authRef?.api.getAccessToken({
+      body: { accountId, userId },
+    });
+    return (res as { accessToken?: string } | undefined)?.accessToken;
+  } catch (err) {
+    console.error('[auth] getAccessToken (GitHub refresh) failed:', (err as Error)?.message);
+    return undefined;
+  }
+}
+
 export const auth = betterAuth({
   database: db,
   secret: secretKey,
@@ -87,6 +112,13 @@ export const auth = betterAuth({
     github: {
       clientId: process.env.GITHUB_CLIENT_ID || '',
       clientSecret: process.env.GITHUB_CLIENT_SECRET || '',
+      // Persist the GitHub *login* (handle) as the user's name and the avatar as the image.
+      // Without this, Better Auth stores `profile.name` (the display name, e.g. "Ayush"), so the
+      // UI shows a name instead of the handle and avatar derivation is unreliable.
+      mapProfileToUser: (profile: { login?: string; name?: string; avatar_url?: string }) => ({
+        name: profile.login || profile.name || '',
+        image: profile.avatar_url,
+      }),
     },
   },
   plugins: [
@@ -121,17 +153,24 @@ export const auth = betterAuth({
           try {
             if (payload.sub) {
               const account = db
-                .prepare('SELECT accessToken FROM account WHERE userId = ? AND providerId = ? LIMIT 1')
-                .get(payload.sub, 'github') as { accessToken?: string } | undefined;
-              userAccessToken = account?.accessToken;
+                .prepare('SELECT id FROM account WHERE userId = ? AND providerId = ? LIMIT 1')
+                .get(payload.sub, 'github') as { id?: string } | undefined;
 
+              // Mint a FRESH GitHub token (refreshing via the stored refresh token if the current
+              // one has expired). The raw `account.accessToken` is often stale — GitHub App user
+              // tokens expire in ~8h — which is why the gateway got "Bad credentials".
+              if (account?.id) {
+                userAccessToken = await getFreshGithubToken(account.id, payload.sub);
+              }
+
+              // `user.name` now holds the GitHub login (see mapProfileToUser).
               const userRow = db
                 .prepare('SELECT name FROM user WHERE id = ? LIMIT 1')
                 .get(payload.sub) as { name?: string } | undefined;
               userLogin = userRow?.name;
             }
-          } catch {
-            // Ignore SQLite lookup error in test/in-memory environments
+          } catch (err) {
+            console.error('[auth:jwt.sign] Failed to resolve GitHub token/login:', err);
           }
 
           return await new SignJWT({
@@ -150,3 +189,6 @@ export const auth = betterAuth({
     }),
   ],
 });
+
+// Wire the forward holder so getFreshGithubToken can reach the configured instance.
+authRef = auth;

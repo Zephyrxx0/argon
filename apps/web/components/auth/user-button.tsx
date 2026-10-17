@@ -3,8 +3,9 @@
 import React, { useState } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import * as Avatar from '@radix-ui/react-avatar';
-import { ChevronDown, LogOut, RefreshCw, User as UserIcon, Shield } from 'lucide-react';
+import { ChevronDown, LogOut, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/app/providers';
+import { githubLogin, userAvatarUrl } from '@/lib/github-identity';
 
 export interface UserButtonProps {
   onOpenAuthModal?: () => void;
@@ -26,9 +27,9 @@ export function UserButton({ onOpenAuthModal, className }: UserButtonProps) {
     }
   };
 
-  const loginHandle = user.name || user.email?.split('@')[0] || 'user';
-  const initials = loginHandle.slice(0, 2).toUpperCase();
-  const avatarUrl = user.image;
+  const loginHandle = githubLogin(user) || 'user';
+  const initials = loginHandle.replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase() || 'U';
+  const avatarUrl = userAvatarUrl(user, 64);
 
   return (
     <DropdownMenu.Root>
@@ -62,18 +63,19 @@ export function UserButton({ onOpenAuthModal, className }: UserButtonProps) {
           data-testid="user-menu-content"
           align="end"
           sideOffset={6}
-          className="w-64 border border-border bg-card shadow-[0_0_30px_rgba(0,0,0,0.85)] font-mono p-1 text-xs outline-none z-50 animate-in fade-in-0 zoom-in-95 duration-100"
+          className="w-64 border border-border bg-card font-mono p-1 text-xs outline-none z-50 animate-in fade-in-0 zoom-in-95 duration-100"
         >
           {/* User Profile Header */}
           <div className="p-3 bg-muted/40 border border-border/40 mb-1 space-y-2">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-sm overflow-hidden bg-background border border-border flex items-center justify-center shrink-0">
+              <Avatar.Root className="w-8 h-8 rounded-sm overflow-hidden bg-background border border-border flex items-center justify-center shrink-0">
                 {avatarUrl ? (
-                  <img src={avatarUrl} alt={loginHandle} className="w-full h-full object-cover" />
-                ) : (
-                  <UserIcon className="w-4 h-4 text-accent" />
-                )}
-              </div>
+                  <Avatar.Image src={avatarUrl} alt={loginHandle} className="w-full h-full object-cover" />
+                ) : null}
+                <Avatar.Fallback className="text-[11px] font-bold text-accent">
+                  {initials}
+                </Avatar.Fallback>
+              </Avatar.Root>
               <div className="overflow-hidden">
                 <div className="font-bold text-foreground truncate">@{loginHandle}</div>
                 {user.email && (
@@ -82,15 +84,6 @@ export function UserButton({ onOpenAuthModal, className }: UserButtonProps) {
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1 border-t border-border/40">
-              <span className="flex items-center gap-1 text-accent">
-                <Shield className="w-3 h-3" />
-                <span>GITHUB VERIFIED</span>
-              </span>
-              <span className="px-1.5 py-0.5 border border-border bg-background text-foreground uppercase tracking-wider font-bold">
-                1 WORKSPACE
-              </span>
-            </div>
           </div>
 
           <DropdownMenu.Separator className="h-[1px] bg-border my-1" />

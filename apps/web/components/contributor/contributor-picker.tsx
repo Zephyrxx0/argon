@@ -1,9 +1,12 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { User, UserCheck, ChevronDown, Search, X, Check } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuth } from '@/app/providers';
+import { useWorkspaceResource } from '@/lib/use-workspace-resource';
+import { githubLogin } from '@/lib/github-identity';
+import type { ContributorsResponse, WorkspaceContributor } from '@/lib/workspace-data';
 
 export interface Contributor {
   id: string;
@@ -16,14 +19,40 @@ export interface Contributor {
   userId?: string;
 }
 
-export const SAMPLE_CONTRIBUTORS: Contributor[] = [
-  { id: 'sarah-connor', name: 'Sarah Connor', role: 'Top Contributor', commits: 342, lastActive: '2d ago' },
-  { id: 'alex-chen', name: 'Alex Chen', role: 'Core Architect', commits: 218, lastActive: '5d ago' },
-  { id: 'marcus-wright', name: 'Marcus Wright', role: 'Component Lead', commits: 154, lastActive: '1w ago' },
-  { id: 'elena-rostova', name: 'Elena Rostova', role: 'Security Reviewer', commits: 88, lastActive: '3w ago' },
-];
+/** "3d ago" style label for an epoch-seconds timestamp. */
+export function formatLastActive(epochSeconds: number | null | undefined, nowMs: number = Date.now()): string {
+  if (!epochSeconds) return 'unknown';
+  const seconds = Math.max(0, Math.floor(nowMs / 1000 - epochSeconds));
+  const units: Array<[number, string]> = [
+    [365 * 86400, 'y'],
+    [30 * 86400, 'mo'],
+    [7 * 86400, 'w'],
+    [86400, 'd'],
+    [3600, 'h'],
+    [60, 'm'],
+  ];
+  for (const [size, label] of units) {
+    if (seconds >= size) return `${Math.floor(seconds / size)}${label} ago`;
+  }
+  return 'just now';
+}
+
+export function toContributor(c: WorkspaceContributor, nowMs?: number): Contributor {
+  return {
+    id: c.id,
+    name: c.name,
+    role: c.role,
+    commits: c.commits,
+    lastActive: formatLastActive(c.lastActiveAt, nowMs),
+    ...(c.avatarUrl ? { avatarUrl: c.avatarUrl } : {}),
+    ...(c.userId ? { userId: c.userId } : {}),
+  };
+}
 
 export interface ContributorPickerProps {
+  /** Workspace whose contributors to load. Required unless `contributors` is supplied. */
+  workspaceId?: string;
+  /** Explicit list (tests / storybook). Skips loading. */
   contributors?: Contributor[];
   currentContributorId?: string | null;
   onSelectContributor: (contributorId: string | null) => void;
@@ -31,25 +60,58 @@ export interface ContributorPickerProps {
 }
 
 export function ContributorPicker({
-  contributors = SAMPLE_CONTRIBUTORS,
+  workspaceId,
+  contributors: contributorsProp,
   currentContributorId = null,
   onSelectContributor,
   className,
 }: ContributorPickerProps) {
-  const { user, isAnonymous } = useAuth();
+  const { user, isAnonymous, getToken } = useAuth();
+  const loaded = useWorkspaceResource<ContributorsResponse>(
+    workspaceId ?? '',
+    'contributors',
+    getToken,
+    // an explicit list (or no workspace) means there is nothing to load
+    !contributorsProp && Boolean(workspaceId),
+    user?.id ?? null
+  );
+  const contributors: Contributor[] = useMemo(() => {
+    if (contributorsProp) return contributorsProp;
+    return loaded.status === 'ready' ? loaded.data.contributors.map((c) => toContributor(c)) : [];
+  }, [contributorsProp, loaded]);
+  const loadState = contributorsProp || !workspaceId ? 'ready' : loaded.status;
+
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const activeContributor = contributors.find((c) => c.id === currentContributorId);
 
-  const checkIsYou = (c: Contributor) => {
+  const myLogin = githubLogin(user);
+  const matchesUser = (c: Contributor) => {
     if (isAnonymous || !user) return false;
     if (c.userId && c.userId === user.id) return true;
-    if (c.login && user.login && c.login.toLowerCase() === user.login.toLowerCase()) return true;
-    if (user.name && c.name.toLowerCase() === user.name.toLowerCase()) return true;
-    return false;
+    const login = myLogin?.toLowerCase();
+    if (!login) return false;
+    return c.id.toLowerCase() === login || c.name.toLowerCase() === login;
   };
+  const checkIsYou = matchesUser;
+
+  // On login, default the identity to the signed-in user (if they appear in this workspace),
+  // falling back to Guest. Only applies while the user hasn't chosen one themselves.
+  const autoSelectedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (contributorsProp) return; // controlled list: don't auto-pick
+    const sig = `${workspaceId}:${user?.id ?? 'guest'}`;
+    if (autoSelectedRef.current === sig) return;
+    if (loadState !== 'ready') return;
+    autoSelectedRef.current = sig;
+    if (currentContributorId) return; // user (or page) already has a selection
+    const me = contributors.find(matchesUser);
+    if (me) onSelectContributor(me.id);
+    // no match => stays Guest (fallback)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadState, workspaceId, user?.id, contributors, contributorsProp]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -82,12 +144,12 @@ export function ContributorPicker({
         className={clsx(
           'flex items-center gap-1.5 px-2.5 py-1.5 border text-xs transition-colors select-none',
           activeContributor
-            ? 'border-purple-500/50 bg-purple-500/10 text-purple-300 hover:border-purple-400'
+            ? 'border-accent bg-accent/10 text-foreground hover:bg-accent/20'
             : 'border-border bg-card text-muted-foreground hover:border-border/80 hover:text-foreground'
         )}
       >
         {activeContributor ? (
-          <UserCheck className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+          <UserCheck className="w-3.5 h-3.5 text-foreground shrink-0" />
         ) : (
           <User className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
         )}
@@ -103,7 +165,7 @@ export function ContributorPicker({
           </span>
         )}
         {activeContributor && (
-          <span className="hidden md:inline-block text-[10px] text-purple-400/80 bg-purple-900/30 px-1 border border-purple-500/30">
+          <span className="hidden md:inline-block text-[10px] text-foreground/80 bg-foreground/10 px-1 border border-foreground/30">
             {activeContributor.role.split(' ')[0]}
           </span>
         )}
@@ -152,8 +214,21 @@ export function ContributorPicker({
 
           <div className="max-h-60 overflow-y-auto divide-y divide-border/30">
             {filtered.length === 0 ? (
-              <div className="p-3 text-center text-xs text-muted-foreground">
-                No matching contributors found.
+              <div
+                data-testid="contributor-empty"
+                role={loadState === 'error' ? 'alert' : 'status'}
+                className={clsx(
+                  'p-3 text-center text-xs',
+                  loadState === 'error' ? 'text-danger' : 'text-muted-foreground'
+                )}
+              >
+                {loadState === 'loading'
+                  ? 'Reading contributors from the graph…'
+                  : loadState === 'error'
+                    ? 'Could not load contributors for this workspace.'
+                    : contributors.length === 0
+                      ? 'No contributors were indexed for this workspace.'
+                      : 'No matching contributors found.'}
               </div>
             ) : (
               filtered.map((contributor) => {
@@ -168,8 +243,8 @@ export function ContributorPicker({
                     className={clsx(
                       'w-full flex items-center justify-between p-2.5 text-left text-xs transition-colors gap-2',
                       isSelected
-                        ? 'bg-purple-950/40 text-purple-200 border-l-2 border-purple-500'
-                        : 'text-foreground hover:bg-muted/60 hover:text-purple-300'
+                        ? 'bg-accent/10 text-foreground border-l-2 border-accent'
+                        : 'text-foreground hover:bg-muted/60 hover:text-accent'
                     )}
                   >
                     <div className="flex items-center gap-2 min-w-0 pr-2">
@@ -182,7 +257,7 @@ export function ContributorPicker({
                       ) : null}
                       <div className="space-y-0.5 truncate">
                         <div className="flex items-center gap-1.5 font-bold">
-                          {isSelected && <Check className="w-3 h-3 text-purple-400 shrink-0" />}
+                          {isSelected && <Check className="w-3 h-3 text-foreground shrink-0" />}
                           <span className="truncate">{contributor.name}</span>
                           {isYou && (
                             <span
@@ -194,14 +269,14 @@ export function ContributorPicker({
                           )}
                         </div>
                         <div className="text-[10px] text-muted-foreground flex items-center gap-1.5">
-                          <span className="text-purple-400">{contributor.role}</span>
+                          <span className="text-foreground">{contributor.role}</span>
                           <span>•</span>
                           <span>Active {contributor.lastActive}</span>
                         </div>
                       </div>
                     </div>
                     <div className="text-[10px] text-muted-foreground font-mono shrink-0">
-                      {contributor.commits} commits
+                      {contributor.commits} {contributor.commits === 1 ? "commit" : "commits"}
                     </div>
                   </button>
                 );

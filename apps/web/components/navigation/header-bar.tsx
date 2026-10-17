@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Terminal, Database } from 'lucide-react';
+import Link from 'next/link';
+import { Terminal } from 'lucide-react';
 import { CommandBar } from '@/components/command/command-bar';
 import { WorkspaceSwitcher, type Workspace } from '@/components/workspace/workspace-switcher';
 import { ContributorPicker } from '@/components/contributor/contributor-picker';
@@ -9,15 +10,18 @@ import { UserButton } from '@/components/auth/user-button';
 import { AuthModal } from '@/components/auth/auth-modal';
 import { useAuth } from '@/app/providers';
 import { clsx } from 'clsx';
+import type { WorkspaceSuggestions } from '@/lib/scenarios';
 
 export interface HeaderBarProps {
   currentQuery?: string;
   isLoading?: boolean;
   error?: string | null;
   onSubmitQuery: (query: string) => void;
+  suggestions?: WorkspaceSuggestions;
   currentWorkspaceId?: string;
   onSelectWorkspace: (id: string) => void;
   onIngestSuccess?: (workspace: Workspace) => void;
+  onRemoveWorkspace?: (id: string) => void;
   currentContributorId?: string | null;
   onSelectContributor: (id: string | null) => void;
   className?: string;
@@ -28,9 +32,11 @@ export function HeaderBar({
   isLoading = false,
   error = null,
   onSubmitQuery,
+  suggestions,
   currentWorkspaceId = 'ember-adr-showcase',
   onSelectWorkspace,
   onIngestSuccess,
+  onRemoveWorkspace,
   currentContributorId = null,
   onSelectContributor,
   className,
@@ -43,43 +49,47 @@ export function HeaderBar({
   return (
     <header
       className={clsx(
-        'h-14 border-b border-border bg-card/95 backdrop-blur-md px-3 sm:px-4 flex items-center justify-between gap-2 sm:gap-4 shrink-0 z-30 font-mono',
+        'h-14 border-b border-border bg-background px-3 sm:px-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-4 shrink-0 z-30 font-mono',
         className
       )}
     >
-      {/* Left: Branding & Engine Indicator */}
-      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        <div className="flex items-center gap-1.5 text-accent">
+      {/* Left: Branding */}
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0 justify-self-start">
+        <Link
+          href="/"
+          aria-label="Argon home"
+          className="flex items-center gap-2 text-foreground hover:bg-foreground hover:text-background px-1.5 py-0.5 -mx-1.5 transition-colors"
+        >
           <Terminal className="h-4 w-4 sm:h-5 sm:w-5" />
-          <span className="text-xs sm:text-sm font-black tracking-widest uppercase">
-            ARGON // 2077
+          <span className="text-xs sm:text-sm font-black tracking-[0.3em] uppercase">
+            ARGON
           </span>
-        </div>
-        <div className="hidden lg:flex items-center gap-1 px-1.5 py-0.5 border border-border bg-muted/30 text-[10px] text-muted-foreground uppercase">
-          <Database className="w-2.5 h-2.5 text-warning" />
-          <span>FalkorDB v0.1</span>
-        </div>
+        </Link>
       </div>
 
-      {/* Center: Dual-Invocation Command Bar */}
-      <div className="flex-1 max-w-xl mx-auto px-1 sm:px-4">
+      {/* Center: Command Bar — fixed column so it never shifts with side-cluster width */}
+      <div className="w-[clamp(220px,42vw,560px)] px-1 sm:px-4 justify-self-center">
         <CommandBar
           value={currentQuery}
           isLoading={isLoading}
           error={error}
           onSubmit={onSubmitQuery}
+          suggestions={suggestions}
         />
       </div>
 
       {/* Right: Workspace Switcher, Contributor Identity & Auth Cluster */}
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-2 min-w-0 justify-self-end">
         <WorkspaceSwitcher
           currentWorkspaceId={currentWorkspaceId}
+          ownerId={isAuthenticated ? user?.id : null}
           onSelectWorkspace={onSelectWorkspace}
           onIngestSuccess={onIngestSuccess}
+          onRemoveWorkspace={onRemoveWorkspace}
         />
 
         <ContributorPicker
+          workspaceId={currentWorkspaceId}
           currentContributorId={currentContributorId}
           onSelectContributor={onSelectContributor}
         />

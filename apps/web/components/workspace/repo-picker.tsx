@@ -344,7 +344,7 @@ export function RepoPicker({
                 {/* Trailing: Visibility Badge + CTA */}
                 <div className="flex items-center gap-2 shrink-0">
                   {repo.private ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 bg-amber-950/30 border border-amber-500/30 px-1.5 py-0.5 rounded-sm">
+                    <span className="inline-flex items-center gap-1 text-[10px] text-warning bg-warning/10 border border-warning/30 px-1.5 py-0.5 rounded-sm">
                       <Lock className="w-3 h-3" />
                       <span>Private</span>
                     </span>

@@ -33,7 +33,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isPending, sessionData]);
 
+  const sessionId: string | null = sessionData?.session?.id ?? null;
+
+  // The identity changes (new guest session, sign-in, sign-out) => the function identity changes,
+  // so effects that depend on it re-run with the right credentials.
   const getToken = useCallback(async (): Promise<string | null> => {
+    // No session yet: the server would answer 401, which is just console noise. Callers are
+    // re-triggered when the session appears (this callback's identity changes with it).
+    if (!sessionId) return cachedToken;
     try {
       if (typeof (authClient as any).token === 'function') {
         const res = await (authClient as any).token();
@@ -56,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Fallback to cached token if network glitch
     }
     return cachedToken;
-  }, [cachedToken]);
+  }, [cachedToken, sessionId]);
 
   const signInWithGithub = useCallback(async () => {
     await authClient.signIn.social({
