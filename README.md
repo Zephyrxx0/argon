@@ -273,6 +273,7 @@ pnpm -r typecheck
 
 ## 🔒 Security & ASVS Level 1 Controls
 
+- **GitHub Access**: Repositories are listed and cloned with the signed-in user's own GitHub OAuth token (`repo` scope); Argon only reads (list + clone) and never writes. No GitHub App installation is required.
 - **SSRF Defense**: Repository ingestion URLs are validated to block private, loopback, and cloud metadata CIDR ranges (127.0.0.1, 10.0.0.0/8, 169.254.169.254).
 - **Prompt Injection Defense**: Untrusted repository content (commit messages, PR bodies) is quarantined within `<EVIDENCE>` tags.
 - **Privacy Hashing**: Committer email addresses are irreversibly hashed using SHA-256 before storage in FalkorDB (`email_hash`).
