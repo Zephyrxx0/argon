@@ -2,8 +2,10 @@
 
 import React, { useId, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Network, FolderTree, GitCompare } from 'lucide-react';
+import { Network, FolderTree, GitCompare, Plug, BookOpen } from 'lucide-react';
 import { clsx } from 'clsx';
+import { McpSetupPanel } from '@/components/workspace/mcp-setup-panel';
+import { GuidePanel } from '@/components/workspace/guide-panel';
 
 // The Pierre components render into shadow roots and touch the DOM on mount: client-only.
 const FileTreePanel = dynamic(
@@ -15,12 +17,14 @@ const DecisionDiffPanel = dynamic(
   { ssr: false }
 );
 
-export type InsightTab = 'graph' | 'files' | 'diff';
+export type InsightTab = 'graph' | 'files' | 'diff' | 'mcp' | 'guide';
 
 const TABS: Array<{ id: InsightTab; label: string; Icon: typeof Network }> = [
   { id: 'graph', label: 'Graph', Icon: Network },
   { id: 'files', label: 'Files', Icon: FolderTree },
   { id: 'diff', label: 'Diff', Icon: GitCompare },
+  { id: 'mcp', label: 'MCP', Icon: Plug },
+  { id: 'guide', label: 'Guide', Icon: BookOpen },
 ];
 
 export interface InsightPaneProps {
@@ -110,6 +114,28 @@ export function InsightPane({
             className={clsx('absolute inset-0', tab === 'diff' ? 'block' : 'hidden')}
           >
             <DecisionDiffPanel workspaceId={workspaceId} citedDecisionIds={citedDecisionIds} />
+          </div>
+        )}
+
+        {visited.has('mcp') && (
+          <div
+            role="tabpanel"
+            id={panelId('mcp')}
+            aria-labelledby={tabId('mcp')}
+            className={clsx('absolute inset-0', tab === 'mcp' ? 'block' : 'hidden')}
+          >
+            <McpSetupPanel workspaceId={workspaceId} />
+          </div>
+        )}
+
+        {visited.has('guide') && (
+          <div
+            role="tabpanel"
+            id={panelId('guide')}
+            aria-labelledby={tabId('guide')}
+            className={clsx('absolute inset-0', tab === 'guide' ? 'block' : 'hidden')}
+          >
+            <GuidePanel />
           </div>
         )}
       </div>
