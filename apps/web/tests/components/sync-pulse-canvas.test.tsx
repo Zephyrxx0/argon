@@ -1,7 +1,15 @@
 import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { HudControls } from '@/components/canvas/hud-controls';
+import { ReactFlowProvider } from '@xyflow/react';
+import { GraphHud } from '@/components/graph/graph-hud';
+
+const renderHud = () =>
+  render(
+    <ReactFlowProvider>
+      <GraphHud direction="LR" onDirectionChange={vi.fn()} onRelayout={vi.fn()} />
+    </ReactFlowProvider>
+  );
 import { BriefingView, type WebBriefingResponse } from '@/components/briefing/briefing-view';
 import * as graphSyncModule from '@/lib/graph-sync';
 
@@ -25,11 +33,11 @@ describe('Live Incremental Sync UI Components (Task 08-03-03, SYNC-03)', () => {
         subscribeSync: vi.fn().mockReturnValue(() => {}),
       });
 
-      render(<HudControls cy={null} />);
+      renderHud();
       expect(screen.queryByTestId('hud-live-sync-badge')).toBeNull();
     });
 
-    it('renders glowing monospace status badge when syncBadgeText is present', () => {
+    it('renders monospace status badge when syncBadgeText is present', () => {
       vi.spyOn(graphSyncModule, 'useGraphSync').mockReturnValue({
         hoveredNodeId: null,
         selectedNodeId: null,
@@ -47,7 +55,7 @@ describe('Live Incremental Sync UI Components (Task 08-03-03, SYNC-03)', () => {
         subscribeSync: vi.fn().mockReturnValue(() => {}),
       });
 
-      render(<HudControls cy={null} />);
+      renderHud();
       const badge = screen.getByTestId('hud-live-sync-badge');
       expect(badge).toBeInTheDocument();
       expect(badge.textContent).toContain('LIVE SYNC • +3 commits, 1 ADR superseded');

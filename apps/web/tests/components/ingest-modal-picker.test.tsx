@@ -22,6 +22,40 @@ vi.mock('@/lib/auth-client', () => {
   };
 });
 
+/** Fakes the gateway: POST ingest(-public) -> queued, GET ingest-status -> given sequence. */
+function mockGateway(opts: {
+  workspaceId: string;
+  statuses?: Array<Record<string, unknown>>;
+  startStatus?: number;
+  startError?: string;
+}) {
+  const statuses = opts.statuses ?? [
+    { status: 'cloning', progress: 0.15, nodeCount: 0, error: null },
+    { status: 'completed', progress: 1, nodeCount: 287, error: null },
+  ];
+  let i = 0;
+  const fetchMock = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+    if (init?.method === 'POST') {
+      if (opts.startStatus && opts.startStatus >= 400) {
+        return Promise.resolve({ ok: false, status: opts.startStatus, json: () => Promise.resolve({ error: opts.startError }) });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 202,
+        json: () => Promise.resolve({ status: 'queued', workspaceId: opts.workspaceId, repositoryFullName: 'x/y' }),
+      });
+    }
+    const st = statuses[Math.min(i++, statuses.length - 1)]!;
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ workspaceId: opts.workspaceId, ...st }),
+    });
+  });
+  global.fetch = fetchMock as any;
+  return fetchMock;
+}
+
 describe('IngestModal & RepoPicker Integration (Task 07-03-01, ING-04)', () => {
   const mockRepos: GitHubRepositoryItem[] = [
     {
@@ -169,6 +203,7 @@ describe('IngestModal & RepoPicker Integration (Task 07-03-01, ING-04)', () => {
 
     const onIngestCompleteSpy = vi.fn();
     const onOpenChangeSpy = vi.fn();
+    mockGateway({ workspaceId: 'argon-org-argon-private-core' });
 
     render(
       <AuthProvider>
@@ -193,8 +228,11 @@ describe('IngestModal & RepoPicker Integration (Task 07-03-01, ING-04)', () => {
       () => {
         expect(onIngestCompleteSpy).toHaveBeenCalledWith(
           expect.objectContaining({
+            // the id comes from the gateway, not from the client
+            id: 'argon-org-argon-private-core',
             name: 'argon-org/argon-private-core',
             repoUrl: 'https://github.com/argon-org/argon-private-core',
+            nodeCount: 287,
           })
         );
       },
@@ -232,5 +270,85 @@ describe('IngestModal & RepoPicker Integration (Task 07-03-01, ING-04)', () => {
     fireEvent.click(submitBtn);
 
     expect(screen.getByTestId('ingest-validation-error')).toHaveTextContent('Repository URL is required');
+  });
+
+  describe('Public Git URL ingestion (real gateway job)', () => {
+    const asGuest = () =>
+      (authClientModule.useSession as any).mockReturnValue({
+        data: { session: { id: 's_guest' }, user: { id: 'u_guest', name: 'Anonymous', isAnonymous: true } },
+        isPending: false,
+      });
+
+    const openUrlTab = (props: Partial<React.ComponentProps<typeof IngestModal>> = {}) => {
+      render(
+        <AuthProvider>
+          <IngestModal open={true} onOpenChange={vi.fn()} onIngestComplete={vi.fn()} {...props} />
+        </AuthProvider>
+      );
+      fireEvent.click(screen.getByTestId('tab-public-git-url'));
+    };
+
+    it('starts a real job via ingest-public, polls status, and hands back the gateway workspace id', async () => {
+      asGuest();
+      const fetchMock = mockGateway({ workspaceId: 'pub-zephyrxx0-treads-a1b2c3' });
+      const onIngestComplete = vi.fn();
+      const onOpenChange = vi.fn();
+      openUrlTab({ onIngestComplete, onOpenChange });
+
+      fireEvent.change(screen.getByTestId('ingest-url-input'), {
+        target: { value: 'https://github.com/Zephyrxx0/treads' },
+      });
+      fireEvent.click(screen.getByTestId('submit-ingest-button'));
+
+      await waitFor(
+        () =>
+          expect(onIngestComplete).toHaveBeenCalledWith({
+            id: 'pub-zephyrxx0-treads-a1b2c3',
+            name: 'Zephyrxx0/treads',
+            repoUrl: 'https://github.com/Zephyrxx0/treads',
+            nodeCount: 287,
+          }),
+        { timeout: 6000 }
+      );
+      expect(onOpenChange).toHaveBeenCalledWith(false);
+
+      const post = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST')!;
+      expect(post[0]).toBe('/api/v1/workspaces/ingest-public');
+      expect(JSON.parse(post[1].body)).toEqual({ repoUrl: 'https://github.com/Zephyrxx0/treads' });
+      expect(fetchMock.mock.calls.some(([u]) => String(u).includes('/pub-zephyrxx0-treads-a1b2c3/ingest-status'))).toBe(true);
+    });
+
+    it('shows the failure reason from a failed job and lets the user go back', async () => {
+      asGuest();
+      mockGateway({
+        workspaceId: 'pub-a-b-000000',
+        statuses: [{ status: 'failed', progress: 0, nodeCount: 0, error: 'repository not found' }],
+      });
+      const onIngestComplete = vi.fn();
+      openUrlTab({ onIngestComplete });
+
+      fireEvent.change(screen.getByTestId('ingest-url-input'), { target: { value: 'https://github.com/a/b' } });
+      fireEvent.click(screen.getByTestId('submit-ingest-button'));
+
+      expect(await screen.findByTestId('ingest-error', {}, { timeout: 4000 })).toHaveTextContent('repository not found');
+      expect(screen.getByText('INGESTION FAILED')).toBeInTheDocument();
+      expect(onIngestComplete).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByTestId('ingest-retry-button'));
+      expect(screen.getByTestId('ingest-url-input')).toBeInTheDocument();
+    });
+
+    it('shows the gateway rejection (e.g. 429 busy) instead of pretending to succeed', async () => {
+      asGuest();
+      mockGateway({ workspaceId: 'x', startStatus: 429, startError: 'You already have an ingestion in progress.' });
+      const onIngestComplete = vi.fn();
+      openUrlTab({ onIngestComplete });
+
+      fireEvent.change(screen.getByTestId('ingest-url-input'), { target: { value: 'https://github.com/a/b' } });
+      fireEvent.click(screen.getByTestId('submit-ingest-button'));
+
+      expect(await screen.findByTestId('ingest-error')).toHaveTextContent('already have an ingestion in progress');
+      expect(onIngestComplete).not.toHaveBeenCalled();
+    });
   });
 });

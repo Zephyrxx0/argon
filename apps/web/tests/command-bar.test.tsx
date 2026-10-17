@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { CommandBar } from '@/components/command/command-bar';
+import { SCENARIO_PRESETS } from '@/lib/scenarios';
 import { CommandDialog } from '@/components/command/command-dialog';
 
 describe('CommandBar Component', () => {
@@ -64,6 +65,8 @@ describe('CommandDialog Component', () => {
         open={true}
         onOpenChange={onOpenChangeMock}
         onSelectQuery={onSelectMock}
+        curated
+        scenarios={SCENARIO_PRESETS}
       />
     );
 
@@ -74,6 +77,50 @@ describe('CommandDialog Component', () => {
 
     expect(onSelectMock).toHaveBeenCalledWith('Refactor billing/retry.ts');
     expect(onOpenChangeMock).toHaveBeenCalledWith(false);
+  });
+
+  it('shows only the workspace\'s own suggestions and entities (no built-in samples)', () => {
+    render(
+      <CommandDialog
+        open={true}
+        onOpenChange={vi.fn()}
+        onSelectQuery={vi.fn()}
+        scenarios={[]}
+        entities={[{ type: 'file', label: 'lib/utils.ts', query: 'lib/utils.ts', desc: 'in lib' }]}
+      />
+    );
+    expect(screen.queryByText('CURATED SCENARIOS')).not.toBeInTheDocument();
+    expect(screen.getByText('lib/utils.ts')).toBeInTheDocument();
+    expect(screen.queryByText('billing/retry.ts')).not.toBeInTheDocument();
+    expect(screen.queryByText('BillingEngine')).not.toBeInTheDocument();
+  });
+
+  it('the scrollable list has a shrinkable flex ancestor chain so it can actually scroll', () => {
+    render(
+      <CommandDialog
+        open
+        onOpenChange={vi.fn()}
+        onSelectQuery={vi.fn()}
+        entities={[{ type: 'file', label: 'a.ts', query: 'a.ts', desc: 'x' }]}
+      />
+    );
+    const list = screen.getByTestId('command-palette-list');
+    // the list scrolls...
+    expect(list.className).toContain('overflow-y-auto');
+    expect(list.className).toContain('min-h-0');
+    // ...and every flex ancestor up to the capped dialog must allow shrinking (min-h-0),
+    // otherwise flex-1 never bounds the list and the scroll is dead (the reported bug).
+    let el: HTMLElement | null = list.parentElement;
+    let sawCap = false;
+    while (el && !sawCap) {
+      const cls = el.className || '';
+      if (cls.includes('flex') && cls.includes('flex-col')) {
+        expect(cls).toContain('min-h-0');
+      }
+      if (cls.includes('max-h-')) sawCap = true;
+      el = el.parentElement;
+    }
+    expect(sawCap).toBe(true);
   });
 });
 

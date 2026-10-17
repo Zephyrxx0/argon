@@ -5,7 +5,7 @@ import { BriefingView } from '@/components/briefing/briefing-view';
 import { ForbiddenCard } from '@/components/briefing/forbidden-card';
 
 describe('Forbidden Access View (403 & 404 Guards)', () => {
-  it('renders high-visibility neon red card with exact 403 Forbidden copy from UI-SPEC', () => {
+  it('renders high-visibility danger-state card with exact 403 Forbidden copy from UI-SPEC', () => {
     const mockWorkspace = 'internal-core-infra';
     const mockOnSelectWorkspace = vi.fn();
 
@@ -24,8 +24,8 @@ describe('Forbidden Access View (403 & 404 Guards)', () => {
     // Verify card rendered
     const card = screen.getByTestId('forbidden-access-card');
     expect(card).toBeInTheDocument();
-    expect(card.className).toContain('border-[#ff0055]');
-    expect(card.className).toContain('text-[#ff0055]');
+    expect(card.className).toContain('border-danger');
+    expect(card.className).toContain('text-danger');
 
     // Verify title copy
     const title = screen.getByTestId('forbidden-title');

@@ -42,4 +42,29 @@ describe('ShowcaseHub Component', () => {
 
     expect(onSelectMock).toHaveBeenCalledWith('Refactor billing/retry.ts', 's1-blast-radius');
   });
+
+  it('shows scenarios passed in for the workspace, labelled as derived, with loading and empty states', () => {
+    const derived = [
+      {
+        id: 's1-blast-radius',
+        badge: 'BLAST RADIUS & OWNERS',
+        title: 'Refactor `lib/utils.ts`',
+        query: 'Refactor lib/utils.ts',
+        description: 'd',
+        iconName: 'git-fork' as const,
+        accentColor: 'x',
+      },
+    ];
+    const { rerender } = render(<ShowcaseHub scenarios={derived} curated={false} workspaceId="ws_treads" />);
+    expect(screen.getByText('SUGGESTED FOR THIS WORKSPACE')).toBeInTheDocument();
+    expect(screen.getByText('ws_treads')).toBeInTheDocument();
+    expect(screen.getByText(/Refactor `lib\/utils\.ts`/)).toBeInTheDocument();
+    expect(screen.queryByText(/billing\/retry/i)).not.toBeInTheDocument();
+
+    rerender(<ShowcaseHub scenarios={[]} curated={false} loading />);
+    expect(screen.getByTestId('scenarios-loading')).toBeInTheDocument();
+
+    rerender(<ShowcaseHub scenarios={[]} curated={false} />);
+    expect(screen.getByTestId('scenarios-empty')).toBeInTheDocument();
+  });
 });

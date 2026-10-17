@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { WorkspaceSwitcher, SHOWCASE_WORKSPACES } from '@/components/workspace/workspace-switcher';
 import { IngestModal, validateGitUrl } from '@/components/workspace/ingest-modal';
 
@@ -112,3 +112,54 @@ describe('IngestModal Component', () => {
   });
 });
 
+
+describe('WorkspaceSwitcher per-account custom workspaces + removal', () => {
+  beforeEach(() => window.localStorage.clear());
+
+  const custom = (ownerId: string | null, items: Array<{ id: string; name: string }>) =>
+    window.localStorage.setItem(
+      `argon.workspaces.custom.${ownerId ?? 'guest'}`,
+      JSON.stringify(items.map((i) => ({ ...i, repoUrl: 'x' })))
+    );
+
+  const open = () => fireEvent.click(screen.getByTestId('workspace-switcher-trigger'));
+
+  it('shows only the signed-in account custom workspaces, never another account', () => {
+    custom('user-alice', [{ id: 'pub-alice-repo', name: 'alice/repo' }]);
+    custom('user-bob', [{ id: 'pub-bob-secret', name: 'bob/secret' }]);
+    custom(null, [{ id: 'pub-guest-x', name: 'guest/x' }]);
+
+    render(<WorkspaceSwitcher ownerId="user-alice" onSelectWorkspace={vi.fn()} />);
+    open();
+    expect(screen.getByTestId('workspace-item-pub-alice-repo')).toBeInTheDocument();
+    expect(screen.queryByTestId('workspace-item-pub-bob-secret')).toBeNull();
+    expect(screen.queryByTestId('workspace-item-pub-guest-x')).toBeNull();
+    // showcase workspaces are always present
+    expect(screen.getByTestId('workspace-item-ember-adr-showcase')).toBeInTheDocument();
+  });
+
+  it('removes a custom workspace, falls back to showcase when it was active', () => {
+    custom('user-alice', [{ id: 'pub-alice-repo', name: 'alice/repo' }]);
+    const onSelect = vi.fn();
+    const onRemove = vi.fn();
+    render(
+      <WorkspaceSwitcher
+        ownerId="user-alice"
+        currentWorkspaceId="pub-alice-repo"
+        onSelectWorkspace={onSelect}
+        onRemoveWorkspace={onRemove}
+      />
+    );
+    open();
+    // showcase entries cannot be removed
+    expect(screen.queryByTestId('workspace-remove-ember-adr-showcase')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('workspace-remove-pub-alice-repo'));
+    expect(onRemove).toHaveBeenCalledWith('pub-alice-repo');
+    // was the active one => falls back to the default showcase
+    expect(onSelect).toHaveBeenCalledWith('ember-adr-showcase');
+    // and it is gone from storage + the list
+    expect(window.localStorage.getItem('argon.workspaces.custom.user-alice')).toBe('[]');
+    expect(screen.queryByTestId('workspace-item-pub-alice-repo')).toBeNull();
+  });
+});

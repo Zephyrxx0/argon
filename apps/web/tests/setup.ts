@@ -1,4 +1,8 @@
 import '@testing-library/jest-dom/vitest';
+import { configure } from '@testing-library/react';
+
+// Pages with lazily-laid-out graphs render slower when the whole monorepo's tests run in parallel
+configure({ asyncUtilTimeout: 5000 });
 
 // Mock ResizeObserver for react-resizable-panels and layout tests
 class ResizeObserverMock {
@@ -29,7 +33,18 @@ if (typeof window !== 'undefined') {
     window.HTMLElement.prototype.scrollIntoView = function () {};
   }
 
-  // Mock HTMLCanvasElement.prototype.getContext for Cytoscape in JSDOM
+  // React Flow measures with DOMMatrixReadOnly, which JSDOM lacks
+  if (!(window as any).DOMMatrixReadOnly) {
+    (window as any).DOMMatrixReadOnly = class {
+      m22: number;
+      constructor(transform?: string) {
+        const scale = transform?.match(/scale\(([1-9.]+)\)/)?.[1];
+        this.m22 = scale !== undefined ? +scale : 1;
+      }
+    };
+  }
+
+  // Mock HTMLCanvasElement.prototype.getContext (landing graph field, html-to-image) in JSDOM
   if (typeof window.HTMLCanvasElement !== 'undefined') {
     window.HTMLCanvasElement.prototype.getContext = function (contextType: string) {
       if (contextType === '2d') {
