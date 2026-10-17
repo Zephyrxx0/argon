@@ -103,13 +103,14 @@ export async function seedWorkspace(
   }
 
   // T-05-09: Initialize schema and ensure clean isolated workspace graph
-  await initWorkspaceGraph(client, workspaceId);
-
   try {
     await client.query(workspaceId, 'MATCH (n) DETACH DELETE n');
   } catch {
     // Ignore if graph was already empty
   }
+
+  // Init after the reset so the (:Workspace {is_public}) node survives (otherwise showcase workspaces 404)
+  await initWorkspaceGraph(client, workspaceId);
 
   // 1. Components
   if (data.components && data.components.length > 0) {

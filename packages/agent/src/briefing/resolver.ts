@@ -53,6 +53,24 @@ export function extractExplicitEntities(text: string): {
   };
 }
 
+const MAX_NAME_CANDIDATES = 40;
+
+/**
+ * Bare words from the task that might be component names ("work on hooks and lib").
+ * These are only *candidates*: they are exact-matched against Component nodes by the
+ * parameterized resolveScope query, so anything that is not a real component is ignored
+ * and nothing unverified ever reaches the briefing.
+ */
+export function extractNameCandidates(text: string): string[] {
+  const out = new Set<string>();
+  for (const raw of text.split(/[^A-Za-z0-9_.@-]+/)) {
+    const token = raw.replace(/\.+$/, '');
+    if (token.length >= 2 && token.length <= 100) out.add(token);
+    if (out.size >= MAX_NAME_CANDIDATES) break;
+  }
+  return Array.from(out);
+}
+
 export async function resolveBriefingScope(
   client: GatewayClient,
   embedder: ArgonEmbedder,
@@ -74,13 +92,18 @@ export async function resolveBriefingScope(
   const uniqueFiles = Array.from(new Set(rawCandidateFiles));
   const uniqueComponents = Array.from(new Set(rawCandidateComponents));
 
+  // Component names mentioned as plain words are looked up too (verified against the graph)
+  const queryNames = Array.from(
+    new Set([...uniqueComponents, ...extractNameCandidates(input.task)])
+  ).slice(0, MAX_NAME_CANDIDATES * 2);
+
   // Concurrently resolve graph scope and vector embedding
   const [resolveScopeResult, embedResult] = await Promise.all([
-    uniqueFiles.length > 0 || uniqueComponents.length > 0
+    uniqueFiles.length > 0 || queryNames.length > 0
       ? client
           .executeQuery(workspaceId, 'resolveScope', {
             paths: uniqueFiles,
-            names: uniqueComponents,
+            names: queryNames,
           })
           .catch(() => null)
       : null,

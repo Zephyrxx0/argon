@@ -1,4 +1,9 @@
-import { BriefingSchema, type Briefing } from '../schemas/briefing.js';
+import {
+  BriefingSchema,
+  LenientBriefingSchema,
+  stripUncitedClaims,
+  type Briefing,
+} from '../schemas/briefing.js';
 import { buildBriefingPrompt } from './prompt.js';
 import { generateStructuredWithFallback, type LLMOptions } from './llm.js';
 import type { EvidenceBundle } from './types.js';
@@ -30,14 +35,24 @@ export async function narrateBriefing(
     if (options?.customGenerator) {
       return await options.customGenerator(promptText);
     }
+    // Ask the model for the lenient shape; the strict schema below is the real gate.
     return await generateStructuredWithFallback(
       promptText,
-      BriefingSchema,
+      LenientBriefingSchema as any,
       options?.llmOptions
     );
   };
 
-  const rawOutput = await generate(initialPrompt);
+  // Drop uncited claims instead of failing the whole briefing (fail-closed per claim).
+  const clean = (output: unknown): unknown => {
+    const { value, stripped } = stripUncitedClaims(output);
+    if (stripped > 0) {
+      console.warn(`[Narrator] Stripped ${stripped} uncited claim(s) from model output.`);
+    }
+    return value;
+  };
+
+  const rawOutput = clean(await generate(initialPrompt));
   const firstParse = BriefingSchema.safeParse(rawOutput);
 
   if (firstParse.success) {
@@ -63,7 +78,7 @@ ${JSON.stringify(rawOutput, null, 2)}
 Please return a corrected, valid JSON object that strictly adheres to the BriefingSchema.
 Every claim in keyTakeaways, affectedComponents, keyOwners, constrainingDecisions, and precedents MUST include non-empty citedNodeIds: string[] matching exact NodeId values from the <EVIDENCE> block above.`;
 
-  const repairedOutput = await generate(repairPrompt);
+  const repairedOutput = clean(await generate(repairPrompt));
   const secondParse = BriefingSchema.safeParse(repairedOutput);
 
   if (!secondParse.success) {

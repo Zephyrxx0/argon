@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   extractExplicitEntities,
+  extractNameCandidates,
   sanitizePath,
   resolveBriefingScope,
 } from '../src/briefing/resolver.js';
@@ -65,6 +66,36 @@ describe('Hybrid Scope Resolver', () => {
       'Update packages/graph/src/client.ts connection logic',
       true
     );
+  });
+
+  it('extracts plain-word component candidates from free-text tasks', () => {
+    const c = extractNameCandidates('I want to work on hooks and lib/utils, plus .planning.');
+    expect(c).toEqual(expect.arrayContaining(['hooks', 'lib', 'utils', '.planning']));
+    expect(c).not.toContain('a');
+    expect(extractNameCandidates('x '.repeat(500)).length).toBeLessThanOrEqual(40);
+  });
+
+  it('looks up bare words as component names and keeps only what the graph returns', async () => {
+    const mockEmbedder = {
+      embed: vi.fn().mockResolvedValue({ vector: new Array(512).fill(0.1), dim: 512, provider: 'local', model: 'm' }),
+    } as unknown as ArgonEmbedder;
+    const executeQuery = vi.fn().mockResolvedValue({
+      raw: [{ matchedFiles: [], allComponents: [{ name: 'hooks' }, { name: 'lib' }] }],
+      graph: { nodes: [], edges: [] },
+      evidence: { nodeCount: 2, edgeCount: 0, primaryIds: [] },
+    });
+
+    const scope = await resolveBriefingScope(
+      { executeQuery } as unknown as GatewayClient,
+      mockEmbedder,
+      'ws-test',
+      { task: 'Refactor hooks and lib please' }
+    );
+
+    const params = executeQuery.mock.calls[0]![2] as { names: string[] };
+    expect(params.names).toEqual(expect.arrayContaining(['hooks', 'lib', 'please']));
+    // only graph-verified components make it into the scope, not the noise words
+    expect(scope.components).toEqual(['hooks', 'lib']);
   });
 });
 

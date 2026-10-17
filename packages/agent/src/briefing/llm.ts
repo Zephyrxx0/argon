@@ -23,6 +23,37 @@ export function isRateLimitError(err: any): boolean {
   );
 }
 
+/**
+ * Gemma models answer in JSON mode but routinely wrap the object in a markdown fence
+ * (```json ... ```) or add prose around it, which the AI SDK's strict parser rejects
+ * ("No object generated: could not parse the response"). Extracts the JSON object text.
+ * Returns null when there is nothing that looks like a JSON object.
+ */
+export function extractJsonText(raw: string): string | null {
+  if (!raw) return null;
+  const text = raw.trim();
+
+  const fenced = /```(?:json|JSON)?\s*([\s\S]*?)```/.exec(text);
+  const candidate = (fenced ? fenced[1]! : text).trim();
+
+  const start = candidate.indexOf('{');
+  const end = candidate.lastIndexOf('}');
+  if (start === -1 || end <= start) return null;
+  return candidate.slice(start, end + 1);
+}
+
+/** Model produced output we could not turn into a schema-valid object (as opposed to a transport/auth failure). */
+export function isUnparseableOutputError(err: any): boolean {
+  if (!err) return false;
+  const name = String(err.name ?? '');
+  return (
+    name === 'AI_NoObjectGeneratedError' ||
+    name === 'AI_JSONParseError' ||
+    name === 'AI_TypeValidationError' ||
+    String(err.message ?? '').includes('No object generated')
+  );
+}
+
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function generateStructuredWithFallback<T>(
@@ -50,6 +81,7 @@ export async function generateStructuredWithFallback<T>(
       model: google(modelName) as any,
       schema: outputSchema,
       prompt: promptText,
+      experimental_repairText: async ({ text }) => extractJsonText(text),
     });
     return result.object;
   };
@@ -59,11 +91,20 @@ export async function generateStructuredWithFallback<T>(
   let lastError: any = null;
 
   // Try primary model with up to 2 rate-limit retries
+  let fallbackReason = 'rate limit exhausted';
   for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
     try {
       return await callModel(primaryModel, prompt, schema);
     } catch (err: any) {
       lastError = err;
+
+      // The model answered but not in a usable shape: retrying the same model rarely helps,
+      // so go straight to the fallback model.
+      if (isUnparseableOutputError(err)) {
+        fallbackReason = 'unparseable output';
+        break;
+      }
+
       if (!isRateLimitError(err)) {
         // Non-429 error fails immediately
         throw err;
@@ -76,9 +117,9 @@ export async function generateStructuredWithFallback<T>(
     }
   }
 
-  // If rate limits exhausted on primary model, fallback to gemini-2.5-flash-lite
+  // If the primary model is rate limited or returns unusable output, fall back to gemini-2.5-flash-lite
   console.warn(
-    `[LLM] Primary model (${primaryModel}) rate limit exhausted. Falling back to ${fallbackModel}`
+    `[LLM] Primary model (${primaryModel}) ${fallbackReason}. Falling back to ${fallbackModel}`
   );
 
   try {
