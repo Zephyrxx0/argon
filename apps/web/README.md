@@ -1,6 +1,6 @@
 # Argon Web (`apps/web`)
 
-> Next.js 15 App Router frontend with brutalist 2077 tweakcn aesthetic, resizable split-viewport, and interactive Cytoscape.js force-directed graph canvas.
+> Next.js 15 App Router frontend: brutalist black-and-white landing page (`/`), the workspace app (`/workspace`) with a resizable split-viewport, a React Flow graph canvas, an `@pierre/trees` file tree and `@pierre/diffs` decision-supersession diffs.
 
 ---
 
@@ -12,9 +12,9 @@ Argon Web implements a split-pane workstation layout (`components/layout/split-v
   - Color-coded typed Evidence Cards with FalkorDB `#id` labels and temporal status badges (`components/briefing/evidence-card.tsx`).
   - High-visibility "No graph, no answer" refusal card on integrity or connection failure (`components/briefing/kill-switch-card.tsx`).
   - Initial Showcase Hub for pre-indexed repositories when no briefing is loaded (`components/hub/showcase-hub.tsx`).
-- **Right Panel (~55% default width)**: Interactive Cytoscape Graph Canvas (`components/canvas/cytoscape-canvas.tsx`).
-  - Client-side physics simulation powered by `cytoscape-fcose`.
-  - 2077 Cyberpunk semantic encoding (`components/canvas/stylesheet.ts`):
+- **Right Panel (~55% default width)**: Interactive graph canvas built on `@xyflow/react` (`components/graph/graph-canvas.tsx`): typed node cards with clamped text, labelled step edges, hover/selection focus, legend filter, minimap, PNG export.
+  - Layered auto-layout via `@dagrejs/dagre` (`lib/graph/layout.ts`); picks left→right or top→bottom to fit the pane.
+  - Monochrome semantic encoding (shape + brightness; colour only for state) (`components/canvas/stylesheet.ts`):
     - Decisions: `diamond` (`#ffb800` warning gold / superseded in `#ff0055` red dashed).
     - Components: `round-rectangle` (`#00f0ff` cyan).
     - Files: `rectangle` (`#58a6ff` blue).
@@ -38,7 +38,7 @@ Argon Web implements a split-pane workstation layout (`components/layout/split-v
 
 - **Framework**: Next.js 15.2.0 (App Router, Turbopack ready, static prerendering)
 - **Styling**: Tailwind CSS 3.4 + Radix UI primitives + Lucide React
-- **Graph Visualization**: Cytoscape.js 3.31 + `cytoscape-fcose` 2.2
+- **Graph Visualization**: @xyflow/react 12 + @dagrejs/dagre 3
 - **Testing**: Vitest 3.2 + `@testing-library/react` + JSDOM
 - **Schema Validation**: Zod 3.24
 
@@ -74,7 +74,7 @@ The test suite in `apps/web/tests/` provides 100% automated coverage for fronten
 - `evidence-card.test.tsx`: Evidence card rendering and "Focus in Graph" dispatch.
 - `briefing-view.test.tsx`: Briefing stream sections, loading skeletons, and Kill-Switch card.
 - `api-briefing.test.ts`: Route handler Zod validation and client auto-selection.
-- `cytoscape-style.test.ts`: 2077 node geometry and color selector mapping.
+- `graph-model.test.ts` / `graph-canvas.test.tsx`: graph parsing, layout, focus and canvas behaviour.
 - `graph-sync.test.ts`: Bidirectional state transitions between cards and canvas.
 - `page-integration.test.tsx`: End-to-end query execution to canvas rendering.
 

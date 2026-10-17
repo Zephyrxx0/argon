@@ -32,8 +32,8 @@ Argon is built as a modular monorepo cleanly separating query execution, agent b
 ```mermaid
 flowchart TD
     subgraph ClientLayer ["Client & Visualization Layer"]
-        Web["Next.js 15 Web App<br/>(Tailwind CSS / Cyberpunk 2077)"]
-        Canvas["Cytoscape.js Physics Canvas<br/>(fcose layout / Multi-level highlighting)"]
+        Web["Next.js 15 Web App<br/>(Tailwind CSS / brutalist monochrome)"]
+        Canvas["React Flow Graph Canvas<br/>(dagre layout / hover + citation focus)"]
         CmdK["Dual Command Palette<br/>(Header & Cmd+K)"]
         Web --> Canvas
         Web --> CmdK
@@ -97,7 +97,7 @@ flowchart TD
                                 ARGON RUNTIME ARCHITECTURE
 +---------------------------------------------------------------------------------------+
 |  apps/web (Next.js 15)                                                                |
-|  [ CommandBar (Cmd+K) ]  <--->  [ Briefing Stream ]  <--->  [ Cytoscape.js Canvas ]   |
+|  [ CommandBar (Cmd+K) ]  <--->  [ Briefing Stream ]  <--->  [ React Flow Canvas ]     |
 +-------------------------------------------+-------------------------------------------+
                                             | POST /api/briefing
                                             v
@@ -230,13 +230,13 @@ pnpm demo:check
 ```bash
 pnpm dev
 ```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:3000](http://localhost:3000) for the landing page; the app lives at [/workspace](http://localhost:3000/workspace).
 
 ### 4. Interactive Scenarios to Explore
 - **Scenario S1: Before Changing Code ("Refactor billing/retry.ts")**
   - Switch to workspace **`synthetic-demo`** in the header.
   - In the command bar (`Cmd+K`), type: `"Refactor billing/retry.ts"`.
-  - **What to observe**: Argon flags that `DEC-001` (linear retry) was superseded after Revert #42 and enforces `DEC-002` (exponential backoff with full jitter). The Cytoscape canvas highlights the affected `billing` component and displays the supersession edge in gold.
+  - **What to observe**: Argon flags that `DEC-001` (linear retry) was superseded after Revert #42 and enforces `DEC-002` (exponential backoff with full jitter). The graph canvas highlights the affected `billing` component and draws the supersession edge in red.
 - **Scenario S2: Getting Started in an Area ("Work on the auth layer")**
   - Type: `"I want to work on the auth layer"`.
   - **What to observe**: Argon computes the blast radius, identifies key experts (Alice / Bob) using edge-weighted authorship, and surfaces starter issues and governing security decisions (`DEC-004`).
@@ -277,7 +277,7 @@ pnpm -r typecheck
 - **Prompt Injection Defense**: Untrusted repository content (commit messages, PR bodies) is quarantined within `<EVIDENCE>` tags.
 - **Privacy Hashing**: Committer email addresses are irreversibly hashed using SHA-256 before storage in FalkorDB (`email_hash`).
 - **Fail-Closed API Gateway**: The Cloud Run Hono gateway enforces bearer token authentication on `GRAPH.RO_QUERY` with zero default access.
-- **Memory Safety**: Cytoscape instances and canvas animation timers are strictly cleaned up on unmount.
+- **Memory Safety**: Graph observers and canvas animation timers are strictly cleaned up on unmount.
 
 ---
 
@@ -293,7 +293,7 @@ For a deep dive into our methodology, temporal openCypher modeling, and backtest
 ```
 argon/
 ├── apps/
-│   ├── web/                     # Next.js 15 Cyberpunk 2077 UI & Cytoscape Canvas
+│   ├── web/                     # Next.js 15 brutalist UI: landing, workspace, React Flow canvas, @pierre/trees file tree, @pierre/diffs decision diffs
 │   └── gateway/                 # Cloud Run Hono Gateway for GRAPH.RO_QUERY
 ├── packages/
 │   ├── agent/                   # Briefing orchestration, narration, & citation verification
