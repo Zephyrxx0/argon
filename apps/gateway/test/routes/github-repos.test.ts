@@ -94,6 +94,46 @@ describe('GitHub Repository & Ingestion Routes (Task 07-02-02, ING-04, TENANT-02
     expect(body.repositories[0].private).toBe(true);
   });
 
+  it('forwards the GitHub access token from the JWT (userAccessToken) to the service', async () => {
+    const getUserRepositories = vi.fn().mockResolvedValue(mockRepos);
+    const app = createGatewayApp({
+      gatewaySecret: TEST_SECRET,
+      githubAppService: { getUserRepositories, verifyUserInstallation: vi.fn(), getInstallationToken: vi.fn() } as unknown as GitHubAppService,
+    });
+
+    const userToken = await sign(
+      { userId: 'user-789', isAnonymous: false, userAccessToken: 'gho_secret_token' },
+      TEST_SECRET,
+      'HS256'
+    );
+
+    const res = await app.request('/api/v1/github/repositories', {
+      headers: { Authorization: `Bearer ${userToken}` },
+    });
+
+    expect(res.status).toBe(200);
+    // the token must reach the service, otherwise no installations/repos are listed (the bug)
+    expect(getUserRepositories).toHaveBeenCalledWith('gho_secret_token', undefined, undefined);
+  });
+
+  it('passes the GitHub login so repos can be resolved via the App installation (no user-token call)', async () => {
+    const getUserRepositories = vi.fn().mockResolvedValue(mockRepos);
+    const app = createGatewayApp({
+      gatewaySecret: TEST_SECRET,
+      githubAppService: { getUserRepositories, verifyUserInstallation: vi.fn(), getInstallationToken: vi.fn() } as unknown as GitHubAppService,
+    });
+    const userToken = await sign(
+      { userId: 'user-789', isAnonymous: false, login: 'Zephyrxx0' },
+      TEST_SECRET,
+      'HS256'
+    );
+    const res = await app.request('/api/v1/github/repositories', {
+      headers: { Authorization: `Bearer ${userToken}` },
+    });
+    expect(res.status).toBe(200);
+    expect(getUserRepositories).toHaveBeenCalledWith(undefined, undefined, 'Zephyrxx0');
+  });
+
   it('rejects unauthenticated requests to POST /api/v1/github/ingest with 401', async () => {
     const app = createGatewayApp({
       gatewaySecret: TEST_SECRET,

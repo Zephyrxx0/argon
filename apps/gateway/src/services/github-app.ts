@@ -41,6 +41,8 @@ export class GitHubAppService {
   private authFn?: (params: { type: 'installation'; installationId: number }) => Promise<{ token: string; expiresAt: string }>;
   private octokitFactory: (auth: string) => Octokit;
   private options?: GitHubAppServiceOptions;
+  /** App-authenticated Octokit (App JWT), used to enumerate the App's own installations. */
+  private appOctokit?: Octokit;
 
   constructor(options?: GitHubAppServiceOptions) {
     this.options = options;
@@ -63,7 +65,46 @@ export class GitHubAppService {
         const res = await auth({ type: 'installation', installationId });
         return { token: res.token, expiresAt: res.expiresAt };
       };
+      // App-level client (App JWT) for listing the App's installations without any user token.
+      if (!this.appOctokit) {
+        this.appOctokit = new Octokit({
+          authStrategy: createAppAuth,
+          auth: { appId: this.appId, privateKey: this.privateKey },
+        });
+      }
     }
+  }
+
+  /**
+   * Lists the installations of THIS GitHub App (App-authenticated; no user token needed).
+   * Returns `[]` when the App isn't configured or the call fails.
+   */
+  async listAppInstallations(): Promise<Array<{ id: number; accountLogin: string | null }>> {
+    if (!this.appOctokit) return [];
+    try {
+      const res = await this.appOctokit.rest.apps.listInstallations({ per_page: 100 });
+      return res.data.map((i) => ({
+        id: i.id,
+        accountLogin:
+          (i.account && 'login' in i.account ? (i.account as { login?: string }).login : null) ?? null,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Repositories the App can see for a given GitHub login, found via the App's own installation
+   * list. This works even when the user's OAuth token can't call `/user/installations` (the common
+   * "You must authenticate with an access token authorized to a GitHub App" 403).
+   */
+  async getRepositoriesForLogin(login: string): Promise<GitHubRepositoryItem[]> {
+    const normalized = login.trim().toLowerCase();
+    if (!normalized) return [];
+    const installations = await this.listAppInstallations();
+    const match = installations.find((i) => (i.accountLogin ?? '').toLowerCase() === normalized);
+    if (!match) return [];
+    return this.getInstallationRepositories(match.id);
   }
 
   /**
@@ -171,10 +212,18 @@ export class GitHubAppService {
    */
   async getUserRepositories(
     userAccessToken?: string,
-    targetInstallationId?: number
+    targetInstallationId?: number,
+    login?: string
   ): Promise<GitHubRepositoryItem[]> {
     if (targetInstallationId) {
       return await this.getInstallationRepositories(targetInstallationId);
+    }
+
+    // Preferred: match the user to one of the App's installations by login. Works regardless of
+    // whether the user's OAuth token can enumerate installations.
+    if (login) {
+      const viaApp = await this.getRepositoriesForLogin(login);
+      if (viaApp.length > 0) return viaApp;
     }
 
     if (userAccessToken) {
