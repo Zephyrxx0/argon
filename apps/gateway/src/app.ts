@@ -11,7 +11,7 @@ import { githubRoute, type GitHubRouteOptions } from './routes/github.js';
 import { GitHubUserService } from './services/github-user.js';
 import { eventsRoute, type EventsRouteOptions } from './routes/events.js';
 import { eventBroadcaster } from './services/event-broadcaster.js';
-import { runIngestion } from '@argon/ingest';
+import { runIngestion, type IngestSummary } from '@argon/ingest';
 
 export interface GatewayAppOptions {
   graphClient?: ArgonGraphClient;
@@ -24,6 +24,22 @@ export interface GatewayAppOptions {
 }
 
 const PUBLIC_INGEST_MAX_COMMITS = 500;
+
+/**
+ * Tells live subscribers what an ingestion changed, so open briefings that cite a changed file or
+ * a superseded decision can show the "repository updated" banner.
+ */
+function broadcastSync(workspaceId: string, summary: IngestSummary): void {
+  eventBroadcaster.broadcast(workspaceId, 'sync:complete', {
+    workspaceId,
+    updated: {
+      commits: summary.delta.newCommits,
+      files: summary.delta.newFiles,
+      decisions: summary.delta.newDecisions,
+    },
+    superseded: summary.delta.supersededDecisions,
+  });
+}
 
 export function createGatewayApp(options?: GatewayAppOptions): Hono {
   const app = new Hono();
@@ -55,13 +71,9 @@ export function createGatewayApp(options?: GatewayAppOptions): Hono {
       depth: PUBLIC_INGEST_MAX_COMMITS,
       maxCommits: PUBLIC_INGEST_MAX_COMMITS,
     })
-      .then(() => {
+      .then((summary) => {
         // Keep the live-sync UI meaningful without webhooks: tell subscribers the graph changed.
-        eventBroadcaster.broadcast(payload.workspaceId, 'sync:complete', {
-          workspaceId: payload.workspaceId,
-          updated: { commits: [], files: [], decisions: [] },
-          superseded: [],
-        });
+        broadcastSync(payload.workspaceId, summary);
       })
       .catch((err) => {
         console.error(`[gateway:ingest] Ingestion failed for ${payload.repositoryFullName}:`, err?.message ?? err);
@@ -81,12 +93,8 @@ export function createGatewayApp(options?: GatewayAppOptions): Hono {
       depth: PUBLIC_INGEST_MAX_COMMITS,
       maxCommits: PUBLIC_INGEST_MAX_COMMITS,
     })
-      .then(() => {
-        eventBroadcaster.broadcast(payload.workspaceId, 'sync:complete', {
-          workspaceId: payload.workspaceId,
-          updated: { commits: [], files: [], decisions: [] },
-          superseded: [],
-        });
+      .then((summary) => {
+        broadcastSync(payload.workspaceId, summary);
       })
       .catch((err) => {
         console.error(`[gateway:ingest] Public ingestion failed for ${payload.repositoryFullName}:`, err?.message ?? err);
@@ -94,7 +102,32 @@ export function createGatewayApp(options?: GatewayAppOptions): Hono {
       .finally(payload.release);
   };
 
+  // Re-sync an existing workspace: full git re-mine + GitHub activity since the last completed job.
+  const defaultOnRefresh: NonNullable<GitHubRouteOptions['onRefresh']> = (payload) => {
+    runIngestion({
+      repoUrl: payload.repoUrl,
+      workspaceId: payload.workspaceId,
+      jobId: payload.jobId,
+      accessToken: payload.accessToken,
+      client: options?.graphClient,
+      userId: payload.userId,
+      userLogin: payload.userLogin,
+      userEmails: payload.userEmails,
+      depth: PUBLIC_INGEST_MAX_COMMITS,
+      maxCommits: PUBLIC_INGEST_MAX_COMMITS,
+      github: { since: payload.since },
+    })
+      .then((summary) => {
+        broadcastSync(payload.workspaceId, summary);
+      })
+      .catch((err) => {
+        console.error(`[gateway:refresh] Re-sync failed for ${payload.repositoryFullName}:`, err?.message ?? err);
+      })
+      .finally(payload.release);
+  };
+
   const githubRouteOptions: GitHubRouteOptions = {
+    onRefresh: options?.githubRouteOptions?.onRefresh ?? defaultOnRefresh,
     onIngest: options?.githubRouteOptions?.onIngest ?? defaultOnIngest,
     onIngestPublic: options?.githubRouteOptions?.onIngestPublic ?? defaultOnIngestPublic,
     ...options?.githubRouteOptions,

@@ -10,6 +10,7 @@ import {
   precedentSearch,
   pathBetween,
   componentOverview,
+  revertHistory,
   ResolveScopeParamsSchema,
   BlastRadiusParamsSchema,
   RiskRankingParamsSchema,
@@ -18,6 +19,7 @@ import {
   PrecedentSearchParamsSchema,
   PathBetweenParamsSchema,
   ComponentOverviewParamsSchema,
+  RevertHistoryParamsSchema,
 } from '@argon/graph';
 import { type ZodSchema } from 'zod';
 import { ErrorCodes, type GatewayErrorResponse } from '../types.js';
@@ -60,6 +62,10 @@ const QUERY_MAP: Record<string, QueryDefinition> = {
     schema: ComponentOverviewParamsSchema,
     fn: componentOverview,
   },
+  revertHistory: {
+    schema: RevertHistoryParamsSchema,
+    fn: revertHistory,
+  },
 };
 
 const ALIAS_MAP: Record<string, string> = {
@@ -79,6 +85,8 @@ const ALIAS_MAP: Record<string, string> = {
   pathBetween: 'pathBetween',
   component_overview: 'componentOverview',
   componentOverview: 'componentOverview',
+  revert_history: 'revertHistory',
+  revertHistory: 'revertHistory',
 };
 
 export interface QueryRouteOptions {

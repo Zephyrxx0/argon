@@ -137,3 +137,17 @@ export function effectiveJob(row: JobRow | null | undefined, nowSeconds: number)
   }
   return { status, progress, error };
 }
+
+/**
+ * Overlap subtracted from "the last completed ingestion" when re-syncing, so a PR / issue changed
+ * while that ingestion was still reading (or across a small clock skew) is read again. Re-reading
+ * is harmless: every graph write is a MERGE.
+ */
+export const REFRESH_OVERLAP_SECONDS = 5 * 60;
+
+/** ISO timestamp a re-sync should read GitHub activity from, or undefined when there is no completed job. */
+export function refreshSince(lastCompletedAtSeconds: unknown): string | undefined {
+  const t = Number(lastCompletedAtSeconds);
+  if (!Number.isFinite(t) || t <= 0) return undefined;
+  return new Date(Math.max(0, t - REFRESH_OVERLAP_SECONDS) * 1000).toISOString();
+}

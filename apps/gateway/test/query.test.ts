@@ -36,6 +36,50 @@ describe('Gateway Query Router', () => {
     expect(body.evidence.nodeCount).toBeGreaterThanOrEqual(0);
   });
 
+  it('dispatches revert_history (snake_case and camelCase) with the validated parameters', async () => {
+    const roQuery = vi.fn().mockResolvedValue({
+      data: [
+        {
+          node: { id: 3, labels: ['PullRequest'], properties: { id: 'pr_rev', is_revert: true } },
+          reverted: { id: 4, labels: ['PullRequest'], properties: { id: 'pr_orig' } },
+          files: ['src/auth.ts'],
+        },
+      ],
+    });
+    const app = createGatewayApp({
+      graphClient: { ping: vi.fn().mockResolvedValue(true), roQuery } as unknown as ArgonGraphClient,
+      gatewaySecret: TEST_SECRET,
+    });
+
+    for (const name of ['revert_history', 'revertHistory']) {
+      const res = await app.request(`/api/v1/test-ws/query/${name}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${TEST_SECRET}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ files: ['src/auth.ts'] }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as any;
+      expect(body.evidence.primaryIds).toContain('pr_rev');
+    }
+    // limit defaults to 20 via the shared Zod schema
+    expect(roQuery.mock.calls[0]![2]).toEqual({ files: ['src/auth.ts'], limit: 20 });
+    expect(roQuery.mock.calls[0]![1]).toContain('is_revert = true');
+  });
+
+  it('rejects revert_history without files (400 VALIDATION_ERROR)', async () => {
+    const app = createGatewayApp({
+      graphClient: { ping: vi.fn().mockResolvedValue(true), roQuery: vi.fn() } as unknown as ArgonGraphClient,
+      gatewaySecret: TEST_SECRET,
+    });
+    const res = await app.request('/api/v1/test-ws/query/revert_history', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${TEST_SECRET}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files: [] }),
+    });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as GatewayErrorResponse).code).toBe('VALIDATION_ERROR');
+  });
+
   it('dispatches resolveScope in camelCase and returns 200', async () => {
     const mockClient = {
       ping: vi.fn().mockResolvedValue(true),

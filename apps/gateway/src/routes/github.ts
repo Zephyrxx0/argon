@@ -2,7 +2,13 @@ import { Hono } from 'hono';
 import type { ArgonGraphClient } from '@argon/graph';
 import { checkWorkspaceAccess, setUserWorkspaceAccess } from '@argon/graph';
 import { randomUUID } from 'node:crypto';
-import { IngestLimiter, effectiveJob, parsePublicRepoUrl, publicWorkspaceId } from '../services/public-ingest.js';
+import {
+  IngestLimiter,
+  effectiveJob,
+  parsePublicRepoUrl,
+  publicWorkspaceId,
+  refreshSince,
+} from '../services/public-ingest.js';
 import { GitHubUserService } from '../services/github-user.js';
 import { ErrorCodes, type GatewayErrorResponse, type JwtAuthUser } from '../types.js';
 
@@ -39,7 +45,24 @@ export interface PrivateIngestParams {
   release: () => void;
 }
 
+export interface RefreshIngestParams {
+  repoUrl: string;
+  repositoryFullName: string;
+  /** The caller's GitHub OAuth token, when they have one (private repositories need it). */
+  accessToken?: string;
+  workspaceId: string;
+  jobId: string;
+  userId: string;
+  userLogin?: string;
+  userEmails?: string[];
+  /** ISO timestamp: read GitHub PRs / issues changed since then (end of the last completed job, minus an overlap). */
+  since?: string;
+  release: () => void;
+}
+
 export interface GitHubRouteOptions {
+  /** Re-sync an existing workspace from its repository. */
+  onRefresh?: (params: RefreshIngestParams) => Promise<void> | void;
   onIngestPublic?: (params: PublicIngestParams) => Promise<void> | void;
   onIngest?: (params: PrivateIngestParams) => Promise<void> | void;
   ingestLimiter?: IngestLimiter;
@@ -271,6 +294,172 @@ export function githubRoute(
     }
 
     return c.json({ status: 'queued', workspaceId, jobId, repositoryFullName: repo.fullName }, 202);
+  });
+
+  /**
+   * POST /:workspaceId/refresh - Re-sync a workspace from its repository ("keep it current",
+   * no webhooks). Git history is re-mined in full (components and coupling are derived from the
+   * whole window, so a partial window would corrupt them) and GitHub PRs / reviews / issues are
+   * read incrementally, since the last completed ingestion. Everything is idempotent.
+   * Only the workspace owner may do this; the response is 202 and progress is read through
+   * GET /:workspaceId/ingest-status, like any other ingestion.
+   */
+  router.post('/:workspaceId/refresh', async (c) => {
+    const workspaceId = c.req.param('workspaceId');
+    const user = (c.get as any)('user') as JwtAuthUser | undefined;
+
+    if (!user?.userId) {
+      return c.json<GatewayErrorResponse>(
+        { error: 'Authentication required to refresh a workspace', code: ErrorCodes.UNAUTHORIZED },
+        401
+      );
+    }
+    if (!/^[a-zA-Z0-9_-]+$/.test(workspaceId)) {
+      return c.json<GatewayErrorResponse>(
+        { error: 'Invalid workspace id', code: ErrorCodes.VALIDATION_ERROR },
+        400
+      );
+    }
+    if (!graphClient || !options?.onRefresh) {
+      return c.json<GatewayErrorResponse>(
+        { error: 'Re-sync is not available on this gateway', code: ErrorCodes.INTERNAL_ERROR },
+        503
+      );
+    }
+
+    let latest: Record<string, any> | null;
+    let lastCompletedAt: unknown;
+    try {
+      if (user.userId !== 'admin') {
+        const role = await graphClient.roQuery<{ role: string | null }>(
+          workspaceId,
+          `MATCH (w:Workspace {id: $workspaceId})
+           OPTIONAL MATCH (u:User {id: $userId})-[r:ACCESSES]->(w)
+           RETURN count(w) AS exists, r.role AS role`,
+          { workspaceId, userId: user.userId }
+        );
+        const row = (role.data?.[0] ?? {}) as { exists?: number; role?: string | null };
+        if (!Number(row.exists ?? 0)) {
+          return c.json<GatewayErrorResponse>(
+            { error: `Workspace '${workspaceId}' not found`, code: ErrorCodes.NOT_FOUND },
+            404
+          );
+        }
+        if (row.role !== 'owner') {
+          return c.json<GatewayErrorResponse>(
+            { error: 'Only the workspace owner can re-sync it', code: ErrorCodes.FORBIDDEN },
+            403
+          );
+        }
+      }
+
+      const jobs = await graphClient.roQuery<Record<string, unknown>>(
+        workspaceId,
+        `MATCH (j:IngestJob)
+         RETURN j.id AS jobId, j.status AS status, j.progress AS progress, j.error AS error,
+                j.repo_url AS repoUrl, j.updated_at AS updatedAt
+         ORDER BY j.updated_at DESC LIMIT 1`
+      );
+      latest = (jobs.data?.[0] ?? null) as Record<string, any> | null;
+
+      const completed = await graphClient.roQuery<Record<string, unknown>>(
+        workspaceId,
+        `MATCH (j:IngestJob {status: 'completed'}) RETURN max(j.updated_at) AS at`
+      );
+      lastCompletedAt = (completed.data?.[0] as any)?.at;
+    } catch (err: any) {
+      const msg = String(err?.message ?? '');
+      if (msg.includes('empty key')) {
+        return c.json<GatewayErrorResponse>(
+          { error: `Workspace '${workspaceId}' not found`, code: ErrorCodes.NOT_FOUND },
+          404
+        );
+      }
+      return c.json<GatewayErrorResponse>(
+        { error: msg || 'Failed to read workspace state', code: ErrorCodes.INTERNAL_ERROR },
+        500
+      );
+    }
+
+    if (!latest?.repoUrl) {
+      return c.json<GatewayErrorResponse>(
+        {
+          error: 'This workspace has no ingestion to re-sync. Ingest a repository first.',
+          code: ErrorCodes.VALIDATION_ERROR,
+        },
+        409
+      );
+    }
+    const current = effectiveJob(latest, Math.floor(Date.now() / 1000));
+    if (!['completed', 'failed'].includes(current.status)) {
+      return c.json<GatewayErrorResponse>(
+        { error: 'An ingestion is already running for this workspace', code: ErrorCodes.RATE_LIMITED },
+        409
+      );
+    }
+
+    // The stored URL is re-validated like any user-supplied one (SSRF / local-path defence).
+    const repo = parsePublicRepoUrl(latest.repoUrl);
+    if (!repo.ok) {
+      return c.json<GatewayErrorResponse>(
+        { error: `This workspace cannot be re-synced from here: ${repo.error}`, code: ErrorCodes.VALIDATION_ERROR },
+        422
+      );
+    }
+
+    // A signed-in user's token reads private repositories; it must still have access.
+    const token = userToken(user);
+    if (token) {
+      const meta = await githubUserService.getRepository(token, repo.owner, repo.repo);
+      if (!meta) {
+        return c.json<GatewayErrorResponse>(
+          {
+            error: `Repository '${repo.fullName}' is no longer accessible with your GitHub account`,
+            code: ErrorCodes.NOT_FOUND,
+          },
+          404
+        );
+      }
+    }
+
+    const slot = limiter.tryAcquire(user.userId);
+    if ('reason' in slot) {
+      return c.json<GatewayErrorResponse>(
+        {
+          error:
+            slot.reason === 'user'
+              ? 'You already have an ingestion in progress. Wait for it to finish.'
+              : 'The server is busy ingesting other repositories. Try again shortly.',
+          code: ErrorCodes.RATE_LIMITED,
+        },
+        429
+      );
+    }
+
+    const jobId = `job_${randomUUID().slice(0, 8)}`;
+    const since = refreshSince(lastCompletedAt);
+    try {
+      await options.onRefresh({
+        repoUrl: repo.url,
+        repositoryFullName: repo.fullName,
+        accessToken: token,
+        workspaceId,
+        jobId,
+        userId: user.userId,
+        userLogin: ((user as any).login || (user as any).userLogin || (user as any).name) as string | undefined,
+        userEmails: user.email ? [user.email as string] : undefined,
+        since,
+        release: slot.release,
+      });
+    } catch (err: any) {
+      slot.release();
+      return c.json<GatewayErrorResponse>(
+        { error: err?.message || 'Failed to start re-sync', code: ErrorCodes.INTERNAL_ERROR },
+        500
+      );
+    }
+
+    return c.json({ status: 'queued', workspaceId, jobId, repositoryFullName: repo.fullName, since: since ?? null }, 202);
   });
 
   /**
