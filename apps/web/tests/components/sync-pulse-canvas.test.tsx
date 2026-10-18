@@ -24,6 +24,7 @@ describe('Live Incremental Sync UI Components (Task 08-03-03, SYNC-03)', () => {
         setHoveredNode: vi.fn(),
         setSelectedNode: vi.fn(),
         focusNode: vi.fn(),
+        focusNodes: vi.fn(),
         clearSelection: vi.fn(),
         setHighlightedIds: vi.fn(),
         lastSyncEvent: null,
@@ -46,6 +47,7 @@ describe('Live Incremental Sync UI Components (Task 08-03-03, SYNC-03)', () => {
         setHoveredNode: vi.fn(),
         setSelectedNode: vi.fn(),
         focusNode: vi.fn(),
+        focusNodes: vi.fn(),
         clearSelection: vi.fn(),
         setHighlightedIds: vi.fn(),
         lastSyncEvent: null,
@@ -96,6 +98,7 @@ describe('Live Incremental Sync UI Components (Task 08-03-03, SYNC-03)', () => {
         setHoveredNode: vi.fn(),
         setSelectedNode: vi.fn(),
         focusNode: vi.fn(),
+        focusNodes: vi.fn(),
         clearSelection: vi.fn(),
         setHighlightedIds: vi.fn(),
         lastSyncEvent: {
@@ -125,6 +128,7 @@ describe('Live Incremental Sync UI Components (Task 08-03-03, SYNC-03)', () => {
         setHoveredNode: vi.fn(),
         setSelectedNode: vi.fn(),
         focusNode: vi.fn(),
+        focusNodes: vi.fn(),
         clearSelection: vi.fn(),
         setHighlightedIds: vi.fn(),
         lastSyncEvent: {
@@ -165,6 +169,7 @@ describe('Live Incremental Sync UI Components (Task 08-03-03, SYNC-03)', () => {
         setHoveredNode: vi.fn(),
         setSelectedNode: vi.fn(),
         focusNode: vi.fn(),
+        focusNodes: vi.fn(),
         clearSelection: vi.fn(),
         setHighlightedIds: vi.fn(),
         lastSyncEvent: {

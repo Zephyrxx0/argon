@@ -176,6 +176,7 @@ export const MCP_TOOLS: Array<{ name: string; blurb: string }> = [
   { name: 'precedent_search', blurb: 'Vector + graph search over past decisions (text is embedded for you).' },
   { name: 'revert_history', blurb: 'Reverts that touched these files and what they reverted.' },
   { name: 'risk_ranking', blurb: 'PageRank over the component dependency graph.' },
+  { name: 'counterfactual_impact', blurb: 'What-if: what a change to one component disturbs, ranked, with decisions and owners.' },
   { name: 'path_between', blurb: 'Shortest dependency path between two components.' },
   { name: 'component_overview', blurb: 'Files, decisions and dependencies of one component.' },
   { name: 'resolve_scope', blurb: 'Map paths/names to real graph entities.' },

@@ -69,11 +69,12 @@ describe('lib/mcp-setup', () => {
     expect(() => JSON.parse(toml)).toThrow();
   });
 
-  it('lists all 12 MCP tools including generate_briefing and no raw cypher tool', () => {
-    expect(MCP_TOOLS).toHaveLength(12);
+  it('lists all 13 MCP tools including generate_briefing and no raw cypher tool', () => {
+    expect(MCP_TOOLS).toHaveLength(13);
     const names = MCP_TOOLS.map((t) => t.name);
     expect(names).toContain('generate_briefing');
     expect(names).toContain('revert_history');
+    expect(names).toContain('counterfactual_impact');
     expect(names.some((n) => /cypher|raw/i.test(n))).toBe(false);
   });
 

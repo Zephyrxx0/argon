@@ -19,6 +19,17 @@ export function closedNeighborhood(nodeId: string, edges: FlowEdge[]): Neighborh
   return { nodeIds, edgeIds };
 }
 
+/** The union of the closed neighbourhoods of several nodes (several cited nodes lit up together). */
+export function unionNeighborhood(nodeIds: string[], edges: FlowEdge[]): Neighborhood {
+  const out: Neighborhood = { nodeIds: new Set(), edgeIds: new Set() };
+  for (const id of nodeIds) {
+    const hood = closedNeighborhood(id, edges);
+    for (const n of hood.nodeIds) out.nodeIds.add(n);
+    for (const e of hood.edgeIds) out.edgeIds.add(e);
+  }
+  return out;
+}
+
 /**
  * Maps an id coming from elsewhere in the UI (evidence cards use `#id`, the graph may or may
  * not) onto the id actually present in the graph. Returns null when there is no such node.

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { authClient, useSession } from '@/lib/auth-client';
+import { rememberGuestForLinking } from '@/lib/custom-workspaces';
 
 export interface AuthContextValue {
   session: any;
@@ -66,11 +67,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [cachedToken, sessionId]);
 
   const signInWithGithub = useCallback(async () => {
+    // Signing in replaces the guest session; remember which one it was so its workspaces follow the account
+    if (sessionData?.user && (sessionData.user as any).isAnonymous) {
+      rememberGuestForLinking(sessionData.user.id);
+    }
     await authClient.signIn.social({
       provider: 'github',
       callbackURL: typeof window !== 'undefined' ? window.location.href : '/',
     });
-  }, []);
+  }, [sessionData]);
 
   const handleSignOut = useCallback(async () => {
     try {

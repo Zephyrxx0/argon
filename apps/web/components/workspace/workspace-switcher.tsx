@@ -6,6 +6,12 @@ import { IngestModal } from './ingest-modal';
 import { clsx } from 'clsx';
 import { useAuth } from '@/app/providers';
 import { startRefresh, waitForIngest } from '@/lib/ingest-client';
+import {
+  adoptGuestWorkspaces,
+  loadCustomWorkspaces,
+  saveCustomWorkspaces,
+  storageKeyForOwner as storageKey,
+} from '@/lib/custom-workspaces';
 
 export interface Workspace {
   id: string;
@@ -24,10 +30,10 @@ export const SHOWCASE_WORKSPACES: Workspace[] = [
     isDefault: true,
   },
   {
-    id: 'astro-rfc-showcase',
-    name: 'Astro RFC Corpus',
-    repoUrl: 'https://github.com/withastro/roadmap',
-    nodeCount: 96,
+    id: 'argon-dogfood',
+    name: 'Argon Dogfood',
+    repoUrl: 'https://github.com/argon/argon',
+    nodeCount: 46,
   },
   {
     id: 'synthetic-demo',
@@ -37,32 +43,20 @@ export const SHOWCASE_WORKSPACES: Workspace[] = [
   },
 ];
 
-const CUSTOM_WORKSPACES_KEY = 'argon.workspaces.custom';
+// Custom (ingested) workspaces are remembered per account (see lib/custom-workspaces.ts). Guest
+// sessions get their own list, so one user's cloned repos never appear for another account.
+export const storageKeyForOwner = storageKey;
 
-// Custom (ingested) workspaces are remembered per account. The guest session gets its own bucket
-// so one user's cloned repos never appear for another account on the same browser.
-export function storageKeyForOwner(ownerId: string | null | undefined): string {
-  return `${CUSTOM_WORKSPACES_KEY}.${ownerId || 'guest'}`;
-}
-
-function loadCustomWorkspaces(ownerId: string | null | undefined): Workspace[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(storageKeyForOwner(ownerId));
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed)
-      ? parsed.filter((w): w is Workspace => typeof w?.id === 'string' && typeof w?.name === 'string')
-      : [];
-  } catch {
-    return [];
-  }
-}
+/** Window event that removes a workspace from the remembered list (and leaves it if it is open). */
+export const REMOVE_WORKSPACE_EVENT = 'argon:remove-workspace';
 
 export interface WorkspaceSwitcherProps {
   workspaces?: Workspace[];
   currentWorkspaceId?: string;
   /** The account these custom workspaces belong to (guest sessions get their own bucket). */
   ownerId?: string | null;
+  /** True for a signed-in account: the list of the guest session that was just linked is adopted. */
+  authenticated?: boolean;
   onSelectWorkspace: (id: string) => void;
   onIngestSuccess?: (workspace: Workspace) => void;
   onRemoveWorkspace?: (id: string) => void;
@@ -77,6 +71,7 @@ export function WorkspaceSwitcher({
   workspaces: baseWorkspaces = SHOWCASE_WORKSPACES,
   currentWorkspaceId = 'ember-adr-showcase',
   ownerId,
+  authenticated = false,
   onSelectWorkspace,
   onIngestSuccess,
   onRemoveWorkspace,
@@ -88,7 +83,12 @@ export function WorkspaceSwitcher({
   const [customWorkspaces, setCustomWorkspaces] = useState<Workspace[]>([]);
   // Ingested repositories live in FalkorDB; remember them per account so they survive a reload
   // but never show for a different account.
-  useEffect(() => setCustomWorkspaces(loadCustomWorkspaces(ownerId)), [ownerId]);
+  useEffect(() => {
+    // Signing in links the guest session: its remembered workspaces now belong to the account
+    // (the server moved their access), so they are carried over instead of being lost.
+    const adopted = authenticated && ownerId ? adoptGuestWorkspaces<Workspace>(ownerId) : null;
+    setCustomWorkspaces(adopted ?? loadCustomWorkspaces<Workspace>(ownerId));
+  }, [ownerId, authenticated]);
   const workspaces = [
     ...baseWorkspaces,
     ...customWorkspaces.filter((c) => !baseWorkspaces.some((b) => b.id === c.id)),
@@ -116,13 +116,7 @@ export function WorkspaceSwitcher({
     setIsOpen(false);
   };
 
-  const persist = (next: Workspace[]) => {
-    try {
-      window.localStorage.setItem(storageKeyForOwner(ownerId), JSON.stringify(next));
-    } catch {
-      // storage unavailable: still usable for this session
-    }
-  };
+  const persist = (next: Workspace[]) => saveCustomWorkspaces(ownerId, next);
 
   const handleIngestComplete = (newWorkspace: Workspace) => {
     setCustomWorkspaces((prev) => {
@@ -166,6 +160,18 @@ export function WorkspaceSwitcher({
     }
     onRemoveWorkspace?.(id);
   };
+
+  // "Remove from my list" from outside the dropdown (e.g. the banner of a workspace that no longer exists)
+  const removeRef = useRef(handleRemove);
+  removeRef.current = handleRemove;
+  useEffect(() => {
+    const onRemove = (e: Event) => {
+      const id = (e as CustomEvent<{ workspaceId?: string }>).detail?.workspaceId;
+      if (id) removeRef.current(id);
+    };
+    window.addEventListener(REMOVE_WORKSPACE_EVENT, onRemove);
+    return () => window.removeEventListener(REMOVE_WORKSPACE_EVENT, onRemove);
+  }, []);
 
   return (
     <>

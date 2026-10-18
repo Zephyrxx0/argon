@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Crosshair, ExternalLink, ShieldCheck, AlertOctagon, GitCommit, FileCode, Box, User, Users, ArrowRight, GitPullRequest, CircleDot } from 'lucide-react';
+import { Crosshair, ExternalLink, ShieldCheck, AlertOctagon, GitCommit, FileCode, Box, User, Users, ArrowRight, GitPullRequest, CircleDot, MessageSquare, Hourglass } from 'lucide-react';
 import { useGraphSync } from '@/lib/graph-sync';
 import { clsx } from 'clsx';
 
@@ -9,7 +9,7 @@ export type EvidenceNodeType = 'DECISION' | 'COMPONENT' | 'FILE' | 'PERSON' | 'T
 
 /** A link to where a fact came from (pull request, issue, commit...). */
 export interface EvidenceLink {
-  kind: 'pull_request' | 'issue' | 'commit' | 'document' | 'decision';
+  kind: 'pull_request' | 'issue' | 'commit' | 'document' | 'decision' | 'chat';
   label: string;
   url: string;
   state?: string;
@@ -35,6 +35,16 @@ export interface EvidenceCardProps {
   validTo?: string;
   supersededBy?: string;
   sourceUrl?: string;
+  /** What the source link points at, when it is not a plain document / commit (e.g. a chat thread). */
+  sourceLabel?: string;
+  /** The source is invented demo data (the synthetic chat source): say so on the card. */
+  sourceSynthetic?: boolean;
+  /** Whole days the decision has been in force; with `stale` it drives the age badge. */
+  ageDays?: number | null;
+  /** In force for longer than the freshness threshold: shows a STALE badge. */
+  stale?: boolean;
+  /** The threshold behind `stale`, shown in the badge tooltip. */
+  staleAfterDays?: number;
   /** Where this node was extracted from: its pull request and the issue that PR closed. */
   links?: EvidenceLink[];
   /** Hide the validity badge (people / teams are not "in force"). */
@@ -53,6 +63,11 @@ export function EvidenceCard({
   validTo,
   supersededBy,
   sourceUrl,
+  sourceLabel,
+  sourceSynthetic = false,
+  ageDays,
+  stale = false,
+  staleAfterDays,
   links,
   hideValidity = false,
   properties,
@@ -128,6 +143,18 @@ export function EvidenceCard({
             {typeConfig.icon}
             <span>{type}</span>
           </span>
+
+          {/* Freshness: only decisions in force for longer than the threshold are flagged */}
+          {stale && ageDays != null && (
+            <span
+              data-testid="evidence-stale-badge"
+              title={`In force for ${ageDays} days${staleAfterDays ? ` (more than ${staleAfterDays})` : ''}: check it still holds`}
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border border-warning/60 bg-warning/10 text-warning"
+            >
+              <Hourglass className="w-2.5 h-2.5" aria-hidden="true" />
+              <span>Stale · {ageDays}d</span>
+            </span>
+          )}
 
           {/* Node ID Badge */}
           <code
@@ -228,10 +255,11 @@ export function EvidenceCard({
             target="_blank"
             rel="noopener noreferrer"
             data-testid="evidence-source-link"
-            className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-accent transition-colors truncate max-w-[200px]"
+            data-synthetic={sourceSynthetic || undefined}
+            className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-accent transition-colors truncate max-w-[260px]"
           >
-            <ExternalLink className="w-3 h-3 shrink-0" />
-            <span className="truncate">Source Provenance</span>
+            {sourceLabel ? <MessageSquare className="w-3 h-3 shrink-0" aria-hidden="true" /> : <ExternalLink className="w-3 h-3 shrink-0" />}
+            <span className="truncate">{sourceLabel ?? 'Source Provenance'}</span>
           </a>
         ) : (
           <span className="text-[10px] text-muted-foreground/60 italic">

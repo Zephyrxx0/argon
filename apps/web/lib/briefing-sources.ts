@@ -1,4 +1,4 @@
-import type { CodeOwnerItem, EvidenceSource } from '@argon/agent';
+import type { CodeOwnerItem, EvidenceSource, FreshnessSummary } from '@argon/agent';
 
 /**
  * Provenance helpers for the briefing UI. Every link comes from `response.sources`, which the
@@ -36,7 +36,7 @@ export function decisionProvenance(
 ): DecisionProvenance {
   const id = clean(decisionId);
   const mine = linkableSources(sources).filter((s) => s.relatedTo === id);
-  const origin = mine.find((s) => s.nodeId === id && (s.kind === 'commit' || s.kind === 'document' || s.kind === 'decision'));
+  const origin = mine.find((s) => s.nodeId === id && (s.kind === 'commit' || s.kind === 'document' || s.kind === 'decision' || s.kind === 'chat'));
   const links = mine.filter((s) => s !== origin && (s.kind === 'pull_request' || s.kind === 'issue'));
   // pull requests first, then issues
   links.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'pull_request' ? -1 : 1));
@@ -69,6 +69,7 @@ export function sourceChipLabel(s: EvidenceSource): string {
   if (s.kind === 'pull_request') return 'PR';
   if (s.kind === 'issue') return 'Issue';
   if (s.kind === 'commit') return 'Commit';
+  if (s.kind === 'chat') return s.synthetic ? 'Chat (synthetic)' : 'Chat';
   return 'Source';
 }
 
@@ -78,4 +79,14 @@ export function ownersOfRecord(
   component?: string
 ): CodeOwnerItem[] {
   return (codeOwners ?? []).filter((o) => !component || o.component === component);
+}
+
+/** Age of one decision as computed by the pipeline (not recomputed in the browser). */
+export function decisionAge(
+  freshness: FreshnessSummary | null | undefined,
+  decisionId: string
+): { ageDays: number | null; stale: boolean } | undefined {
+  const id = clean(decisionId);
+  const hit = freshness?.decisions.find((d) => d.decisionId === id);
+  return hit ? { ageDays: hit.ageDays, stale: hit.stale } : undefined;
 }

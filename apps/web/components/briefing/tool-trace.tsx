@@ -43,7 +43,7 @@ export function ToolTracePanel({ trace, selection, className }: ToolTracePanelPr
       <div className="flex items-center justify-between border-b border-border/80 pb-2">
         <div className="flex items-center gap-2 text-xs font-bold text-accent uppercase tracking-wider">
           <Wrench className="w-4 h-4 text-accent" aria-hidden="true" />
-          <span>06 // GRAPH TOOLS CALLED</span>
+          <span>07 // GRAPH TOOLS CALLED</span>
         </div>
         <span className="text-[11px] text-muted-foreground font-semibold" data-testid="tool-trace-counts">
           {pipelineCalls} PIPELINE · {llmCalls} LLM-SELECTED

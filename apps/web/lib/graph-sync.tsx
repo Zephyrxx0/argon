@@ -8,7 +8,10 @@ import {
 } from './events-client';
 
 export interface FocusRequest {
+  /** The node the canvas centres on (the first of `nodeIds` for a multi-node focus). */
   nodeId: string;
+  /** Every node to light up together (a verdict reason can cite several). Absent = just `nodeId`. */
+  nodeIds?: string[];
   timestamp: number;
 }
 
@@ -21,6 +24,8 @@ export interface GraphSyncState {
   setHoveredNode: (id: string | null) => void;
   setSelectedNode: (id: string | null) => void;
   focusNode: (id: string) => void;
+  /** Focus several nodes at once; ids that are not on the canvas are ignored by it. */
+  focusNodes: (ids: string[]) => void;
   clearSelection: () => void;
   setHighlightedIds: (ids: string[]) => void;
 
@@ -87,7 +92,16 @@ export function GraphSyncProvider({ children, workspaceId, token }: GraphSyncPro
 
   const focusNode = useCallback((id: string) => {
     setSelectedNodeId(id);
+    setHighlightedIdsState([]);
     setFocusRequest({ nodeId: id, timestamp: Date.now() });
+  }, []);
+
+  const focusNodes = useCallback((ids: string[]) => {
+    const unique = Array.from(new Set(ids.filter((id) => typeof id === 'string' && id.length > 0)));
+    if (unique.length === 0) return;
+    setSelectedNodeId(unique[0]!);
+    setHighlightedIdsState(unique);
+    setFocusRequest({ nodeId: unique[0]!, nodeIds: unique, timestamp: Date.now() });
   }, []);
 
   const clearSelection = useCallback(() => {
@@ -188,6 +202,7 @@ export function GraphSyncProvider({ children, workspaceId, token }: GraphSyncPro
       setHoveredNode,
       setSelectedNode,
       focusNode,
+      focusNodes,
       clearSelection,
       setHighlightedIds,
       lastSyncEvent,
@@ -204,6 +219,7 @@ export function GraphSyncProvider({ children, workspaceId, token }: GraphSyncPro
       setHoveredNode,
       setSelectedNode,
       focusNode,
+      focusNodes,
       clearSelection,
       setHighlightedIds,
       lastSyncEvent,
@@ -229,6 +245,7 @@ export function useGraphSync(): GraphSyncState {
       setHoveredNode: () => {},
       setSelectedNode: () => {},
       focusNode: () => {},
+      focusNodes: () => {},
       clearSelection: () => {},
       setHighlightedIds: () => {},
       lastSyncEvent: null,

@@ -1,17 +1,18 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import type { Briefing, CodeOwnerItem, EvidenceSource, ToolSelectionSummary, ToolTraceEntry, Verdict } from '@argon/agent';
+import type { Briefing, CodeOwnerItem, EvidenceSource, FreshnessSummary, LearningPath, ToolSelectionSummary, ToolTraceEntry, Verdict } from '@argon/agent';
 import { StickyJumpBar, type SectionCitationCounts } from './sticky-jump-bar';
 import { EvidenceCard } from './evidence-card';
 import { KillSwitchCard } from './kill-switch-card';
 import { ForbiddenCard, NotFoundCard } from './forbidden-card';
 import { VerdictCard } from './verdict-card';
 import { ToolTracePanel } from './tool-trace';
-import { Loader2, Layers, GitFork, Users, ShieldAlert, History, GitPullRequest, CircleDot } from 'lucide-react';
+import { LearningPathView } from './learning-path';
+import { Loader2, Layers, GitFork, Users, ShieldAlert, History, GitPullRequest, CircleDot, Hourglass } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useGraphSync } from '@/lib/graph-sync';
-import { citationLinks, decisionProvenance, ownersOfRecord, sourceChipLabel } from '@/lib/briefing-sources';
+import { citationLinks, decisionAge, decisionProvenance, ownersOfRecord, sourceChipLabel } from '@/lib/briefing-sources';
 
 export interface WebBriefingResponse {
   status:
@@ -42,6 +43,10 @@ export interface WebBriefingResponse {
   sources?: EvidenceSource[] | null;
   /** CODEOWNERS owners of record for the components in scope. */
   codeOwners?: CodeOwnerItem[] | null;
+  /** How old the cited decisions are (computed from graph dates and the clock). */
+  freshness?: FreshnessSummary | null;
+  /** Shortest dependency walks between components, annotated with decisions and owners. */
+  learningPaths?: LearningPath[] | null;
 }
 
 export interface BriefingViewProps {
@@ -257,6 +262,21 @@ export function BriefingView({
         {/* GRAPH VERDICT (deterministic, from graph facts) */}
         {response?.verdict && <VerdictCard verdict={response.verdict} />}
 
+        {/* FRESHNESS: one line on how old the cited decisions are */}
+        {response?.freshness && response.freshness.citedWithKnownAge > 0 && (
+          <p
+            data-testid="freshness-note"
+            data-stale={response.freshness.staleCited > 0 ? 'true' : 'false'}
+            className={clsx(
+              'flex items-start gap-2 text-[11px] leading-relaxed',
+              response.freshness.staleCited > 0 ? 'text-warning' : 'text-muted-foreground'
+            )}
+          >
+            <Hourglass className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span>{response.freshness.message}</span>
+          </p>
+        )}
+
         {/* SECTION 1: SUMMARY */}
         <section id="sec-summary" className="space-y-4 scroll-mt-24">
           <div className="flex items-center justify-between border-b border-border/80 pb-2">
@@ -441,6 +461,7 @@ export function BriefingView({
             ) : (
               briefing.constrainingDecisions.map((dec, idx) => {
                 const prov = decisionProvenance(response?.sources, dec.decisionId);
+                const age = decisionAge(response?.freshness, dec.decisionId);
                 return (
                   <EvidenceCard
                     key={`decision-${idx}-${dec.decisionId}`}
@@ -450,6 +471,11 @@ export function BriefingView({
                     description={dec.constraint}
                     validity="VALID"
                     sourceUrl={prov.origin?.url}
+                    sourceLabel={prov.origin?.kind === 'chat' ? prov.origin.label : undefined}
+                    sourceSynthetic={prov.origin?.synthetic}
+                    ageDays={age?.ageDays}
+                    stale={age?.stale}
+                    staleAfterDays={response?.freshness?.staleAfterDays}
                     links={prov.links.map((l) => ({ kind: l.kind as any, label: l.label, url: l.url!, state: l.state }))}
                     properties={{
                       Status: dec.status,
@@ -491,6 +517,8 @@ export function BriefingView({
                     description={prec.relevance}
                     validity="SUPERSEDED"
                     sourceUrl={prov.origin?.url}
+                    sourceLabel={prov.origin?.kind === 'chat' ? prov.origin.label : undefined}
+                    sourceSynthetic={prov.origin?.synthetic}
                     links={prov.links.map((l) => ({ kind: l.kind as any, label: l.label, url: l.url!, state: l.state }))}
                     properties={{
                       Relevance: prec.relevance,
@@ -505,7 +533,12 @@ export function BriefingView({
           </div>
         </section>
 
-        {/* SECTION 6: GRAPH TOOLS CALLED (explainability) */}
+        {/* SECTION 6: LEARNING PATH (algo.SPpaths walk, annotated from the graph) */}
+        {response?.learningPaths && response.learningPaths.length > 0 && (
+          <LearningPathView paths={response.learningPaths} />
+        )}
+
+        {/* SECTION 7: GRAPH TOOLS CALLED (explainability) */}
         {response?.toolTrace && response.toolTrace.length > 0 && (
           <ToolTracePanel
             trace={response.toolTrace}

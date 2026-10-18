@@ -91,7 +91,8 @@ export function HeaderBar({
       <div className="flex items-center gap-2 min-w-0 justify-self-end">
         <WorkspaceSwitcher
           currentWorkspaceId={currentWorkspaceId}
-          ownerId={isAuthenticated ? user?.id : null}
+          ownerId={user?.id ?? null}
+          authenticated={isAuthenticated}
           onSelectWorkspace={onSelectWorkspace}
           onIngestSuccess={onIngestSuccess}
           onRemoveWorkspace={onRemoveWorkspace}

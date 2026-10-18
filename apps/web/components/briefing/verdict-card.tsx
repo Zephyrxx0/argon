@@ -3,7 +3,8 @@
 import React from 'react';
 import type { Verdict } from '@argon/agent';
 import { clsx } from 'clsx';
-import { ShieldCheck, ShieldAlert, OctagonAlert } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, OctagonAlert, Crosshair } from 'lucide-react';
+import { useGraphSync } from '@/lib/graph-sync';
 
 const LEVEL_STYLE = {
   PROCEED: {
@@ -32,6 +33,8 @@ const SEVERITY_TEXT = {
   hold: 'text-danger',
 } as const;
 
+const MAX_CHIPS = 6;
+
 export interface VerdictCardProps {
   verdict: Verdict;
   className?: string;
@@ -45,6 +48,9 @@ export interface VerdictCardProps {
 export function VerdictCard({ verdict, className }: VerdictCardProps) {
   const style = LEVEL_STYLE[verdict.level] ?? LEVEL_STYLE.REVIEW;
   const { Icon } = style;
+  // Same focus mechanism the citation chips use: the canvas lights up the cited nodes and their
+  // edges. Ids that are not drawn on the canvas (e.g. a revert PR) are ignored there.
+  const { focusNode, focusNodes } = useGraphSync();
 
   return (
     <section
@@ -75,9 +81,36 @@ export function VerdictCard({ verdict, className }: VerdictCardProps) {
               </span>
               <span className="text-muted-foreground">{reason.detail}</span>
               {reason.citedNodeIds.length > 0 && (
-                <span className="block text-[10px] text-muted-foreground/80 mt-0.5">
-                  graph nodes: {reason.citedNodeIds.slice(0, 6).join(', ')}
-                  {reason.citedNodeIds.length > 6 ? ` +${reason.citedNodeIds.length - 6} more` : ''}
+                <span
+                  data-testid="verdict-reason-nodes"
+                  className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground/80"
+                >
+                  <span>graph nodes:</span>
+                  {reason.citedNodeIds.slice(0, MAX_CHIPS).map((id) => (
+                    <button
+                      key={id}
+                      type="button"
+                      data-testid="verdict-node-chip"
+                      onClick={() => focusNode(id)}
+                      title={`Show ${id} on the graph`}
+                      className="border border-border bg-background/50 px-1.5 py-0.5 text-foreground transition-colors hover:border-accent hover:text-accent focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent cursor-pointer"
+                    >
+                      {id}
+                    </button>
+                  ))}
+                  {reason.citedNodeIds.length > MAX_CHIPS && (
+                    <span>+{reason.citedNodeIds.length - MAX_CHIPS} more</span>
+                  )}
+                  <button
+                    type="button"
+                    data-testid="verdict-reason-focus"
+                    onClick={() => focusNodes(reason.citedNodeIds)}
+                    aria-label={`Highlight the ${reason.citedNodeIds.length} graph node${reason.citedNodeIds.length === 1 ? '' : 's'} behind ${reason.rule} on the graph`}
+                    className="ml-auto inline-flex items-center gap-1 border border-border px-1.5 py-0.5 font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:border-accent hover:text-accent focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent cursor-pointer"
+                  >
+                    <Crosshair className="h-3 w-3" aria-hidden="true" />
+                    Show on graph
+                  </button>
                 </span>
               )}
             </li>

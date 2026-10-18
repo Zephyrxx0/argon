@@ -15,7 +15,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { clsx } from 'clsx';
 import { useGraphSync } from '@/lib/graph-sync';
-import { closedNeighborhood, resolveNodeId } from '@/lib/graph/focus';
+import { resolveNodeId, unionNeighborhood } from '@/lib/graph/focus';
 import { layoutGraph, pickDirection } from '@/lib/graph/layout';
 import {
   buildFlowGraph,
@@ -63,7 +63,8 @@ const MINIMAP_SHADE: Record<NodeKind, string> = {
 function GraphCanvasInner({ elements, status, view, onViewChange, viewNote, onNodeSelect, className }: GraphCanvasProps) {
   const { fitView } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
-  const { hoveredNodeId, selectedNodeId, focusRequest, setSelectedNode, lastSyncEvent } = useGraphSync();
+  const { hoveredNodeId, selectedNodeId, highlightedIds, focusRequest, setSelectedNode, setHighlightedIds, lastSyncEvent } =
+    useGraphSync();
 
   // null = automatic (best fit for the pane); set once the user picks a direction explicitly
   const [manualDirection, setManualDirection] = useState<LayoutDirection | null>(null);
@@ -86,9 +87,10 @@ function GraphCanvasInner({ elements, status, view, onViewChange, viewNote, onNo
     previousViewRef.current = view;
     setInspectedId(null);
     setSelectedNode(null);
+    setHighlightedIds([]);
     setHiddenKinds(new Set());
     setLocalHover(null);
-  }, [view, setSelectedNode]);
+  }, [view, setSelectedNode, setHighlightedIds]);
 
   // 1. Parse → 2. filter by legend → 3. layout (all pure, memoised)
   const parsedBase = useMemo(() => buildFlowGraph(source, 'LR'), [source]);
@@ -123,11 +125,24 @@ function GraphCanvasInner({ elements, status, view, onViewChange, viewNote, onNo
 
   // Interaction state → visuals
   const selectedId = inspectedId ?? resolveNodeId(laidOut, selectedNodeId);
-  const focusId = localHover ?? resolveNodeId(laidOut, hoveredNodeId) ?? selectedId;
+  // Nodes cited together (a verdict reason can name several); ids that are not drawn are dropped
+  const highlightedKey = highlightedIds.join('\u0000');
+  const highlighted = useMemo(
+    () => highlightedIds.map((id) => resolveNodeId(laidOut, id)).filter((id): id is string => id !== null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [highlightedKey, laidOut]
+  );
+  const singleFocus = localHover ?? resolveNodeId(laidOut, hoveredNodeId);
+  const focusIds: string[] = singleFocus ? [singleFocus] : highlighted.length > 0 ? highlighted : selectedId ? [selectedId] : [];
+  const focusKey = focusIds.join('\u0000');
 
   const { nodes, edges } = useMemo(() => {
-    const hood = focusId ? closedNeighborhood(focusId, visible.edges) : null;
-    const hasFocus = Boolean(hood && laidOut.some((n) => n.id === focusId));
+    const drawn = new Set(laidOut.map((n) => n.id));
+    const hood = unionNeighborhood(
+      focusIds.filter((id) => drawn.has(id)),
+      visible.edges
+    );
+    const hasFocus = hood.nodeIds.size > 0;
 
     const nodes: FlowNode[] = laidOut.map((n) => ({
       ...n,
@@ -138,12 +153,12 @@ function GraphCanvasInner({ elements, status, view, onViewChange, viewNote, onNo
         superseded: n.data.superseded || supersededIds.has(n.id),
         selected: n.id === selectedId,
         pulse: pulseIds.has(n.id),
-        visual: !hasFocus ? 'idle' : hood!.nodeIds.has(n.id) ? 'active' : 'dim',
+        visual: !hasFocus ? 'idle' : hood.nodeIds.has(n.id) ? 'active' : 'dim',
       },
     }));
 
     const edges: FlowEdge[] = visible.edges.map((e) => {
-      const visual = !hasFocus ? 'idle' : hood!.edgeIds.has(e.id) ? 'active' : 'dim';
+      const visual = !hasFocus ? 'idle' : hood.edgeIds.has(e.id) ? 'active' : 'dim';
       const color = e.data?.supersession ? '#ff4d4d' : visual === 'active' ? '#ffffff' : '#5a5a5a';
       return {
         ...e,
@@ -153,7 +168,7 @@ function GraphCanvasInner({ elements, status, view, onViewChange, viewNote, onNo
     });
 
     return { nodes, edges };
-  }, [laidOut, visible.edges, dragged, focusId, selectedId, pulseIds, supersededIds]);
+  }, [laidOut, visible.edges, dragged, focusKey, selectedId, pulseIds, supersededIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const inspected: InspectedNode | null = useMemo(() => {
     if (!inspectedId) return null;
@@ -194,9 +209,11 @@ function GraphCanvasInner({ elements, status, view, onViewChange, viewNote, onNo
   // A briefing citation asked us to focus a node
   useEffect(() => {
     if (!focusRequest) return;
-    const id = resolveNodeId(laidOut, focusRequest.nodeId);
-    if (!id) return;
-    const hood = closedNeighborhood(id, visible.edges);
+    const wanted = focusRequest.nodeIds ?? [focusRequest.nodeId];
+    const resolved = wanted.map((w) => resolveNodeId(laidOut, w)).filter((w): w is string => w !== null);
+    // Nothing asked for is on the canvas (e.g. a pull request that is not drawn): leave the view alone
+    if (resolved.length === 0) return;
+    const hood = unionNeighborhood(resolved, visible.edges);
     setInspectedId(null);
     fitView({
       nodes: [...hood.nodeIds].map((nid) => ({ id: nid })),
@@ -264,6 +281,7 @@ function GraphCanvasInner({ elements, status, view, onViewChange, viewNote, onNo
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onNodeClick={(_, node) => {
+          setHighlightedIds([]);
           setInspectedId(node.id);
           setSelectedNode(node.id);
           onNodeSelect?.(node.id);
@@ -273,6 +291,7 @@ function GraphCanvasInner({ elements, status, view, onViewChange, viewNote, onNo
         onPaneClick={() => {
           setInspectedId(null);
           setSelectedNode(null);
+          setHighlightedIds([]);
         }}
         nodesConnectable={false}
         elementsSelectable
@@ -337,6 +356,7 @@ function GraphCanvasInner({ elements, status, view, onViewChange, viewNote, onNo
         onClose={() => {
           setInspectedId(null);
           setSelectedNode(null);
+          setHighlightedIds([]);
         }}
         className="!left-auto !right-4 !top-4"
       />

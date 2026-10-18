@@ -68,7 +68,9 @@ describe('VerdictCard', () => {
     const list = screen.getByTestId('verdict-reasons');
     expect(within(list).getByText('REVERT_HISTORY')).toBeInTheDocument();
     expect(within(list).getByText(/previously touched these files/)).toBeInTheDocument();
-    expect(within(list).getByText(/graph nodes: PR-042/)).toBeInTheDocument();
+    expect(within(list).getByRole('button', { name: 'PR-042' })).toBeInTheDocument();
+    // at most 6 node chips per reason; the rest are summarised
+    expect(within(list).getAllByTestId('verdict-node-chip').filter((c) => /^(DEC-001|a|b|c|d|e)$/.test(c.textContent ?? ''))).toHaveLength(6);
     expect(within(list).getByText(/\+1 more/)).toBeInTheDocument();
     expect(screen.getByText(/Computed from the graph, not generated/)).toBeInTheDocument();
     expect(screen.getByLabelText('Graph verdict: HOLD')).toBeInTheDocument();

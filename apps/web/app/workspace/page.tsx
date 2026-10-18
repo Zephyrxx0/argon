@@ -19,7 +19,12 @@ import { useWorkspaceResource } from '@/lib/use-workspace-resource';
 import { buildSuggestions } from '@/lib/scenarios';
 import type { FileGraphResponse, GraphView, OverviewResponse } from '@/lib/workspace-data';
 import { InsightPane } from '@/components/workspace/insight-pane';
-import { type Workspace } from '@/components/workspace/workspace-switcher';
+import {
+  type Workspace,
+  SHOWCASE_WORKSPACES,
+  REMOVE_WORKSPACE_EVENT,
+} from '@/components/workspace/workspace-switcher';
+import { WorkspaceUnavailable } from '@/components/workspace/workspace-unavailable';
 import type { GraphElements } from '@/lib/graph/model';
 
 const FILES_VIEW_QUERY = { view: 'files' } as const;
@@ -348,6 +353,10 @@ export default function WorkspacePage() {
     resourceIdentity,
     FILES_VIEW_QUERY
   );
+  // The selected workspace cannot be opened (gone, or not this account's): say so, with a way out
+  const unavailableStatus =
+    overview.status === 'error' && (overview.code === 404 || overview.code === 403) ? overview.code : null;
+  const isBuiltInWorkspace = SHOWCASE_WORKSPACES.some((w) => w.id === currentWorkspaceId);
   const activeGraph = graphView === 'files' ? fileGraph : overview;
   const graphElements: GraphElements | null =
     canvasElements ?? (activeGraph.status === 'ready' ? activeGraph.data.elements : null);
@@ -451,6 +460,18 @@ export default function WorkspacePage() {
                       onSelectWorkspace={handleSelectWorkspace}
                     />
                   </>
+                ) : unavailableStatus ? (
+                  <WorkspaceUnavailable
+                    workspaceId={currentWorkspaceId}
+                    status={unavailableStatus}
+                    removable={!isBuiltInWorkspace}
+                    onOpenShowcase={() => handleSelectWorkspace('ember-adr-showcase')}
+                    onRemove={() =>
+                      window.dispatchEvent(
+                        new CustomEvent(REMOVE_WORKSPACE_EVENT, { detail: { workspaceId: currentWorkspaceId } })
+                      )
+                    }
+                  />
                 ) : (
                   <ShowcaseHub
                     onSelectScenario={handleSelectScenario}

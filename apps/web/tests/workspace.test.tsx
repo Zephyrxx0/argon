@@ -48,7 +48,7 @@ describe('WorkspaceSwitcher Component', () => {
     fireEvent.click(trigger);
 
     expect(screen.getByTestId('workspace-dropdown')).toBeInTheDocument();
-    expect(screen.getByText('Astro RFC Corpus')).toBeInTheDocument();
+    expect(screen.getByText('Argon Dogfood')).toBeInTheDocument();
   });
 
   it('selects new workspace from dropdown list', () => {
@@ -62,10 +62,10 @@ describe('WorkspaceSwitcher Component', () => {
     );
 
     fireEvent.click(screen.getByTestId('workspace-switcher-trigger'));
-    const astroItem = screen.getByTestId('workspace-item-astro-rfc-showcase');
-    fireEvent.click(astroItem);
+    const dogfoodItem = screen.getByTestId('workspace-item-argon-dogfood');
+    fireEvent.click(dogfoodItem);
 
-    expect(onSelectMock).toHaveBeenCalledWith('astro-rfc-showcase');
+    expect(onSelectMock).toHaveBeenCalledWith('argon-dogfood');
   });
 
   it('opens IngestModal when clicking + INGEST GIT REPO', () => {
