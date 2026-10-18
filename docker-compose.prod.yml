@@ -1,0 +1,93 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      - DOMAIN=${DOMAIN}
+      - ACME_EMAIL=${ACME_EMAIL:-admin@${DOMAIN}}
+    depends_on:
+      - web
+      - gateway
+
+  falkordb:
+    image: falkordb/falkordb:latest
+    container_name: argon-falkordb-prod
+    restart: unless-stopped
+    volumes:
+      - falkordb_data:/var/lib/falkordb/data
+    environment:
+      - FALKORDB_ARGS=--save 60 1
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 2s
+
+  gateway:
+    build:
+      context: .
+      dockerfile: apps/gateway/Dockerfile
+    container_name: argon-gateway-prod
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - FALKORDB_URL=redis://falkordb:6379
+      - GATEWAY_SECRET=${GATEWAY_SECRET}
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-gemini}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8080/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      falkordb:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: argon-web-prod
+    restart: unless-stopped
+    volumes:
+      - web_auth_data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - AUTH_DB_PATH=/app/data/auth.sqlite
+      - NEXT_PUBLIC_APP_URL=https://${DOMAIN}
+      - GATEWAY_URL=http://gateway:8080
+      - NEXT_PUBLIC_GATEWAY_URL=https://${DOMAIN}
+      - GATEWAY_SECRET=${GATEWAY_SECRET}
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - FALKORDB_URL=redis://falkordb:6379
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-gemini}
+    depends_on:
+      gateway:
+        condition: service_healthy
+
+volumes:
+  falkordb_data:
+    driver: local
+  web_auth_data:
+    driver: local
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local
+

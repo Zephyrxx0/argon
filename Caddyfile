@@ -1,0 +1,35 @@
+{
+    # Set email for ACME certificate renewal notifications
+    email {$ACME_EMAIL:admin@example.com}
+}
+
+{$DOMAIN:localhost} {
+    encode gzip zstd
+
+    # Security headers
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    }
+
+    # Gateway API & Server-Sent Events (SSE)
+    # flush_interval -1 ensures instantaneous streaming for live progress/sync events
+    handle /api/v1/* {
+        reverse_proxy gateway:8080 {
+            flush_interval -1
+        }
+    }
+
+    # Gateway public health check endpoint
+    handle /health {
+        reverse_proxy gateway:8080
+    }
+
+    # Next.js Frontend & Better Auth endpoints
+    handle {
+        reverse_proxy web:3000
+    }
+}
+
