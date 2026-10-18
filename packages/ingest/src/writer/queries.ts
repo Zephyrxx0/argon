@@ -53,6 +53,9 @@ SET d.title = row.title,
     d.source_url = row.source_url,
     d.source_kind = row.source_kind,
     d.summary = row.summary,
+    // Only set for chat decisions (always true there: chat data is synthetic); null elsewhere
+    d.synthetic = row.synthetic,
+    d.source_channel = row.source_channel,
     // Only vecf32 values enter FalkorDB's vector index; a plain list property is invisible to
     // db.idx.vector.queryNodes, which made precedent search return nothing on ingested repos.
     d.embedding = CASE WHEN row.embedding IS NULL THEN NULL ELSE vecf32(row.embedding) END,

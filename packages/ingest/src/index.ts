@@ -25,6 +25,9 @@ export * from './github/comments.js';
 export * from './github/enrich.js';
 export * from './github/octokit-api.js';
 
+export * from './chat/threads.js';
+export * from './chat/write.js';
+
 export * from './writer/queries.js';
 export * from './writer/falkordb.js';
 export * from './pipeline.js';

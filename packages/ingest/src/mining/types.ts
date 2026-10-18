@@ -5,7 +5,7 @@ export interface MinedDecision {
   valid_from: number; // epoch seconds
   valid_to: number | null; // epoch seconds or null if active
   source_url: string;
-  source_kind: 'adr' | 'rfc' | 'commit' | 'pr' | 'doc' | 'comment';
+  source_kind: 'adr' | 'rfc' | 'commit' | 'pr' | 'doc' | 'comment' | 'chat';
   summary: string;
   raw_text: string;
   embedding?: number[];

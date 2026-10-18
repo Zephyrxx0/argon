@@ -109,6 +109,9 @@ export class FalkorIngestWriter {
       source_kind: string;
       summary: string;
       embedding?: number[];
+      /** Chat decisions only: the data is invented, and the channel it came from. */
+      synthetic?: boolean;
+      source_channel?: string;
     }[]
   ): Promise<void> {
     await this.writeBatch(queries.BATCH_MERGE_DECISIONS, decisions);
