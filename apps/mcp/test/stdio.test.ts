@@ -49,7 +49,7 @@ describe.skipIf(!live)('argon-mcp binary over real stdio', () => {
     const server = await spawnServer({ ARGON_WORKSPACE_ID: ws });
     try {
       const { tools } = await server.client.listTools();
-      expect(tools).toHaveLength(12);
+      expect(tools).toHaveLength(13);
 
       const ranking: any = await server.client.callTool({ name: 'risk_ranking', arguments: { limit: 3 } });
       expect(ranking.isError).toBeFalsy();

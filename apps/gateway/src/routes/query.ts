@@ -11,6 +11,7 @@ import {
   pathBetween,
   componentOverview,
   revertHistory,
+  counterfactualImpact,
   ResolveScopeParamsSchema,
   BlastRadiusParamsSchema,
   RiskRankingParamsSchema,
@@ -20,6 +21,7 @@ import {
   PathBetweenParamsSchema,
   ComponentOverviewParamsSchema,
   RevertHistoryParamsSchema,
+  CounterfactualImpactParamsSchema,
 } from '@argon/graph';
 import { type ZodSchema } from 'zod';
 import { ErrorCodes, type GatewayErrorResponse } from '../types.js';
@@ -66,6 +68,10 @@ const QUERY_MAP: Record<string, QueryDefinition> = {
     schema: RevertHistoryParamsSchema,
     fn: revertHistory,
   },
+  counterfactualImpact: {
+    schema: CounterfactualImpactParamsSchema,
+    fn: counterfactualImpact,
+  },
 };
 
 const ALIAS_MAP: Record<string, string> = {
@@ -87,6 +93,8 @@ const ALIAS_MAP: Record<string, string> = {
   componentOverview: 'componentOverview',
   revert_history: 'revertHistory',
   revertHistory: 'revertHistory',
+  counterfactual_impact: 'counterfactualImpact',
+  counterfactualImpact: 'counterfactualImpact',
 };
 
 export interface QueryRouteOptions {

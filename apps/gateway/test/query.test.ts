@@ -66,6 +66,44 @@ describe('Gateway Query Router', () => {
     expect(roQuery.mock.calls[0]![1]).toContain('is_revert = true');
   });
 
+  it('dispatches counterfactual_impact (snake_case and camelCase) and requires asOf', async () => {
+    const roQuery = vi.fn().mockResolvedValue({
+      data: [
+        {
+          target: 'billing',
+          component: 'ledger',
+          direction: 'DEPENDENT',
+          hops: 1,
+          score: 0.2,
+          decisions: [{ id: 'DEC-2', title: 'Exponential backoff', status: 'active' }],
+          owners: [],
+        },
+      ],
+    });
+    const app = createGatewayApp({
+      graphClient: { ping: vi.fn().mockResolvedValue(true), roQuery } as unknown as ArgonGraphClient,
+      gatewaySecret: TEST_SECRET,
+    });
+    const post = (name: string, body: unknown) =>
+      app.request(`/api/v1/test-ws/query/${name}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${TEST_SECRET}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+    for (const name of ['counterfactual_impact', 'counterfactualImpact']) {
+      const res = await post(name, { component: 'billing', asOf: 1700000000000 });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as any;
+      expect(body.evidence.primaryIds).toEqual(expect.arrayContaining(['ledger', 'DEC-2']));
+    }
+    expect(roQuery.mock.calls[0]![2]).toEqual({ component: 'billing', asOf: 1700000000000 });
+    expect(roQuery.mock.calls[0]![1]).toContain('algo.pageRank');
+
+    expect((await post('counterfactual_impact', { component: 'billing' })).status).toBe(400);
+    expect((await post('counterfactual_impact', { asOf: 5 })).status).toBe(400);
+  });
+
   it('rejects revert_history without files (400 VALIDATION_ERROR)', async () => {
     const app = createGatewayApp({
       graphClient: { ping: vi.fn().mockResolvedValue(true), roQuery: vi.fn() } as unknown as ArgonGraphClient,

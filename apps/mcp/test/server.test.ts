@@ -50,7 +50,7 @@ describe.skipIf(!live)('Argon MCP server (in-memory client, live FalkorDB)', () 
           'record_outcome',
         ].sort()
       );
-      expect(ARGON_TOOLS).toHaveLength(9);
+      expect(ARGON_TOOLS).toHaveLength(10);
 
       for (const def of ARGON_TOOLS) {
         const tool = tools.find((t) => t.name === def.name)!;
@@ -169,6 +169,30 @@ describe.skipIf(!live)('Argon MCP server (in-memory client, live FalkorDB)', () 
       expect(res.evidence.primaryIds).toContain('pr_rev');
     });
 
+    it('counterfactual_impact ranks what a change to Storage disturbs, with in-force decisions', async () => {
+      const res = out(await call('counterfactual_impact', { component: 'Storage', asOf: 2500 }));
+      expect(res.ok).toBe(true);
+      expect(res.rows.map((r: any) => `${r.component}:${r.direction}:${r.hops}`)).toEqual([
+        'Database:DEPENDENT:1',
+        'Auth:DEPENDENT:2',
+      ]);
+      expect(res.rows[0].target).toBe('Storage');
+      // D-02 is in force at 2500, the superseded D-01 is not
+      expect(res.rows[1].decisions.map((d: any) => d.id)).toEqual(['D-02']);
+      expect(res.evidence.primaryIds).toEqual(expect.arrayContaining(['Database', 'Auth', 'D-02']));
+    });
+
+    it('counterfactual_impact: an unknown component gives empty rows, not an error', async () => {
+      const res: any = await call('counterfactual_impact', { component: 'nope' });
+      expect(res.isError).toBeFalsy();
+      expect(out(res).rows).toEqual([]);
+    });
+
+    it('counterfactual_impact rejects a missing component', async () => {
+      const res: any = await call('counterfactual_impact', {});
+      expect(res.isError).toBe(true);
+    });
+
     it('is also reachable with snake_case JSON through the text content block', async () => {
       const res: any = await call('risk_ranking', { limit: 1 });
       const parsed = JSON.parse(textOf(res));
@@ -201,6 +225,7 @@ describe.skipIf(!live)('Argon MCP server (in-memory client, live FalkorDB)', () 
       await call('blast_radius', { files: ['src/auth.ts'] });
       await call('risk_ranking', { limit: 3 });
       await call('revert_history', { files: ['src/auth.ts'] });
+      await call('counterfactual_impact', { component: 'Storage' });
       const after = (await graph.roQuery(ws, 'MATCH (n) RETURN count(n) AS n')).data as any[];
       expect(after[0].n).toBe(before[0].n);
     });

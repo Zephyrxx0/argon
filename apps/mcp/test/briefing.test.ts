@@ -86,11 +86,15 @@ describe.skipIf(!live)('Argon MCP: generate_briefing, tool selection over MCP (l
       const superseded = out.verdict.reasons.find((r: any) => r.rule === 'SUPERSEDED_PRECEDENT');
       expect(superseded.citedNodeIds).toEqual(['D-01']);
 
-      // trace: 6 fixed-pipeline queries + the planner's path_between
+      // trace: 6 fixed-pipeline queries + the planner's path_between, and the two counterfactual_impact
+      // lookups the pipeline itself makes to annotate the learning path of that path_between
       const trace = out.toolTrace as any[];
       expect(trace.filter((t) => t.source === 'pipeline').map((t) => t.tool).sort()).toEqual([
-        'blast_radius', 'constraining_decisions', 'precedent_search', 'revert_history', 'risk_ranking', 'who_knows',
+        'blast_radius', 'constraining_decisions', 'counterfactual_impact', 'counterfactual_impact',
+        'precedent_search', 'revert_history', 'risk_ranking', 'who_knows',
       ]);
+      expect(out.learningPaths).toHaveLength(1);
+      expect(out.learningPaths[0].hops.map((h: any) => h.component)).toEqual(['Auth', 'Database', 'Storage']);
       const llm = trace.filter((t) => t.source === 'llm');
       expect(llm).toHaveLength(1);
       expect(llm[0]).toMatchObject({ tool: 'path_between', status: 'ok', rowCount: 1 });
@@ -105,7 +109,8 @@ describe.skipIf(!live)('Argon MCP: generate_briefing, tool selection over MCP (l
       const rows = (
         await graph.roQuery(ws, 'MATCH (b:Briefing {id: $id}) RETURN b.verdict AS v, b.tool_call_count AS n', { id: out.briefingId })
       ).data as any[];
-      expect(rows[0]).toEqual({ v: 'HOLD', n: 7 });
+      // 6 fixed queries + path_between + the 2 learning-path annotation lookups
+      expect(rows[0]).toEqual({ v: 'HOLD', n: 9 });
     } finally {
       await mcp.close();
     }
@@ -172,7 +177,7 @@ describe.skipIf(!live)('Argon MCP: generate_briefing, tool selection over MCP (l
         const invoker = await createMcpToolInvoker(mcp.client, ws);
         const names = invoker.specs().map((s) => s.name).sort();
         expect(names).toEqual([
-          'blast_radius', 'component_overview', 'constraining_decisions', 'path_between',
+          'blast_radius', 'component_overview', 'constraining_decisions', 'counterfactual_impact', 'path_between',
           'precedent_search', 'revert_history', 'risk_ranking', 'who_knows',
         ]);
         for (const forbidden of ['generate_briefing', 'record_outcome', 'list_workspaces', 'resolve_scope']) {
