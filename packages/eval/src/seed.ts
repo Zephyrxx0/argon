@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ArgonGraphClient, initWorkspaceGraph } from '@argon/graph';
+import { writeChatThreads, type ChatThreadFile } from '@argon/ingest';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -98,6 +99,11 @@ export interface SeedData {
   reviewed?: SeedReviewed[];
   issues?: SeedIssue[];
   owners?: SeedOwner[];
+  /**
+   * Invented chat threads that ended in a decision (5.3). Must declare `"synthetic": true`; written
+   * through the same reader the ingest package exposes, as `Decision {source_kind: 'chat'}`.
+   */
+  chat?: ChatThreadFile;
 }
 
 /**
@@ -420,6 +426,20 @@ export async function seedWorkspace(
        SET r.pattern = o.pattern, r.coverage = o.coverage`;
     await runBatched(client, workspaceId, edge('Team'), teams.map((o) => ({ ...o, coverage: o.coverage ?? 1 })));
     await runBatched(client, workspaceId, edge('Person'), people.map((o) => ({ ...o, coverage: o.coverage ?? 1 })));
+  }
+
+  // 7g. Synthetic chat decisions (needs components and pull requests to exist). Vectors ship in the
+  //     seed, so no embedding model is loaded here.
+  if (data.chat) {
+    const res = await writeChatThreads(client, workspaceId, data.chat, { embed: false });
+    if (!res.embedded) {
+      throw new Error(`Chat decisions in ${seedDataPath} have no embedding; regenerate the seed fixture`);
+    }
+    if (res.skipped.components.length > 0 || res.skipped.pullRequests.length > 0) {
+      throw new Error(
+        `Chat threads in ${seedDataPath} reference unknown graph entities: ${JSON.stringify(res.skipped)}`
+      );
+    }
   }
 
   // 8. DependsOn edges (if present in seed)
