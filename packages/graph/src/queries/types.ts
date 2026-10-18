@@ -132,6 +132,13 @@ export const ConstrainingDecisionsResultSchema = z.array(
     status: z.string(),
     component: z.string(),
     sourceUrl: z.string().nullable().optional(),
+    /** Epoch (seconds, as stored) the decision took effect; drives the age/staleness signal. */
+    validFrom: z.coerce.number().nullable().optional(),
+    /** Where the decision was found: adr | rfc | commit | pr | doc | comment | chat. */
+    sourceKind: z.string().nullable().optional(),
+    /** True for invented demo data (the synthetic chat source). */
+    synthetic: z.boolean().nullable().optional(),
+    sourceChannel: z.string().nullable().optional(),
     // provenance (null when the decision was not extracted from a pull request)
     prId: z.string().nullable().optional(),
     prNumber: z.coerce.number().nullable().optional(),
@@ -221,3 +228,51 @@ export const RevertHistoryResultSchema = z.array(
   })
 );
 export type RevertHistoryResult = z.infer<typeof RevertHistoryResultSchema>;
+
+// ==========================================
+// 10. Counterfactual Impact
+// ==========================================
+
+export const COUNTERFACTUAL_DIRECTIONS = ['DEPENDENT', 'DEPENDENCY'] as const;
+
+export const CounterfactualImpactParamsSchema = z.object({
+  /** The component that would change. */
+  component: z.string().min(1),
+  /** Epoch milliseconds the decisions' validity window is evaluated at. */
+  asOf: z.number().int().positive(),
+  maxDepth: z.number().int().min(1).max(5).default(3),
+  limit: z.number().int().min(1).max(100).default(25),
+});
+export type CounterfactualImpactParams = z.input<typeof CounterfactualImpactParamsSchema>;
+
+export const CounterfactualImpactResultSchema = z.array(
+  z.object({
+    /** The component the change is applied to (same on every row). */
+    target: z.string(),
+    /** An affected component. */
+    component: z.string(),
+    /** DEPENDENT: depends on `target`, breaks if it changes. DEPENDENCY: `target` relies on it. */
+    direction: z.enum(COUNTERFACTUAL_DIRECTIONS),
+    /** Shortest DEPENDS_ON distance from `target`. */
+    hops: z.coerce.number(),
+    /** algo.pageRank centrality of the affected component (higher = more critical). */
+    score: z.coerce.number().nullable().optional(),
+    /** Decisions in force at `asOf` that govern the affected component. */
+    decisions: z.array(
+      z.object({
+        id: z.string(),
+        title: z.string().nullable().optional(),
+        status: z.string().nullable().optional(),
+      })
+    ),
+    /** CODEOWNERS owners of record of the affected component. */
+    owners: z.array(
+      z.object({
+        id: z.string(),
+        name: z.string().nullable().optional(),
+        pattern: z.string().nullable().optional(),
+      })
+    ),
+  })
+);
+export type CounterfactualImpactResult = z.infer<typeof CounterfactualImpactResultSchema>;

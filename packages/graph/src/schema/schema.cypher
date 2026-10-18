@@ -53,7 +53,9 @@
 //   valid_from: INTEGER,   // Epoch timestamp in milliseconds when decision took effect
 //   valid_to: INTEGER,     // Epoch timestamp in milliseconds when superseded (or NULL if current)
 //   source_url: STRING,    // URL or repo-relative link to source document / PR
-//   source_kind: STRING,   // "adr" | "rfc" | "pr" | "commit" | "doc" | "comment"
+//   source_kind: STRING,   // "adr" | "rfc" | "pr" | "commit" | "doc" | "comment" | "chat"
+//   synthetic: BOOLEAN,    // true only for the invented demo chat source (source_kind "chat")
+//   source_channel: STRING // chat decisions only, e.g. "#payments-eng"
 //   embedding: VECTOR,     // 512-dimensional cosine vector
 //   embedding_model: STRING // Model identifier (e.g., "onnx-community/embeddinggemma-2-ONNX" or "text-embedding-004")
 // })

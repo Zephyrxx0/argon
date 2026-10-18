@@ -85,15 +85,26 @@ export async function setUserWorkspaceAccess(
   });
 }
 
+/** Graph used when the client cannot enumerate graphs (e.g. a minimal client): the legacy default. */
+const DEFAULT_MIGRATION_GRAPH = 'ember-adr-showcase';
+
 /**
- * Migrates temporary guest ACCESSES edges to permanent authenticated user upon account linking (D-14).
- * Detaches and removes the temporary guest node.
+ * Names of every graph (workspace) on the connected FalkorDB. Access edges live inside each
+ * workspace's own graph, so a guest's workspaces can only be found by looking at all of them.
  */
-export async function migrateGuestAccess(
-  client: ArgonGraphClient,
-  params: MigrateGuestAccessParams
-): Promise<number> {
-  const cypher = `
+async function listWorkspaceGraphs(client: ArgonGraphClient): Promise<string[]> {
+  try {
+    const raw = typeof client.getRawClient === 'function' ? client.getRawClient() : null;
+    if (raw && typeof raw.list === 'function') {
+      return (await raw.list()).filter((name) => typeof name === 'string' && name.length > 0);
+    }
+  } catch {
+    // fall through to the default graph
+  }
+  return [DEFAULT_MIGRATION_GRAPH];
+}
+
+const MIGRATE_CYPHER = `
     MATCH (guest:User {id: $guestId})-[r:ACCESSES]->(w:Workspace)
     MERGE (u:User {id: $authUserId})
     MERGE (u)-[r2:ACCESSES]->(w)
@@ -102,27 +113,43 @@ export async function migrateGuestAccess(
     RETURN count(w) AS migratedCount;
   `;
 
-  const targetWorkspace = params.workspaceId ?? 'ember-adr-showcase';
-  const res = await client.query<{ migratedCount: number }>(
-    targetWorkspace,
-    cypher,
-    {
-      guestId: params.guestId,
-      authUserId: params.authUserId,
+/**
+ * Migrates temporary guest ACCESSES edges to the permanent authenticated user upon account
+ * linking (D-14), then removes the temporary guest node.
+ *
+ * The edges live in each workspace's own graph (a guest who ingested a repository owns that
+ * workspace there), so every graph is visited, not just the showcase one; otherwise a guest's
+ * workspaces would be lost the moment they sign in. Pass `workspaceId` to limit it to one graph.
+ * Returns the number of workspaces whose access was moved. A graph that cannot be read is skipped
+ * (it never blocks sign-in or the other graphs).
+ */
+export async function migrateGuestAccess(
+  client: ArgonGraphClient,
+  params: MigrateGuestAccessParams
+): Promise<number> {
+  const graphs = params.workspaceId ? [params.workspaceId] : await listWorkspaceGraphs(client);
+  let total = 0;
+
+  for (const graph of graphs) {
+    try {
+      const res = await client.query<{ migratedCount: number }>(graph, MIGRATE_CYPHER, {
+        guestId: params.guestId,
+        authUserId: params.authUserId,
+      });
+      const row = res.data?.[0];
+      const count = row ? Number((row as any).migratedCount ?? 0) : 0;
+      total += count;
+
+      // Clean up a guest node that had no ACCESSES edge in this graph
+      if (count === 0) {
+        await client
+          .query(graph, 'MATCH (guest:User {id: $guestId}) DETACH DELETE guest', { guestId: params.guestId })
+          .catch(() => {});
+      }
+    } catch (err) {
+      console.error(`[migrateGuestAccess] skipped graph "${graph}":`, (err as Error)?.message ?? err);
     }
-  );
-
-  const row = res.data?.[0];
-  const count = row ? Number((row as any).migratedCount ?? 0) : 0;
-
-  // Clean up any detached guest node if guest had no ACCESSES edges
-  if (count === 0) {
-    await client.query(
-      targetWorkspace,
-      'MATCH (guest:User {id: $guestId}) DETACH DELETE guest',
-      { guestId: params.guestId }
-    ).catch(() => {});
   }
 
-  return count;
+  return total;
 }

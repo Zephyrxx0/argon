@@ -39,6 +39,10 @@ import {
   RevertHistoryResultSchema,
   type RevertHistoryParams,
   type RevertHistoryResult,
+  CounterfactualImpactParamsSchema,
+  CounterfactualImpactResultSchema,
+  type CounterfactualImpactParams,
+  type CounterfactualImpactResult,
   type DualPayload,
 } from './types';
 
@@ -135,7 +139,8 @@ WHERE d.valid_from <= $asOf AND (d.valid_to IS NULL OR d.valid_to > $asOf)
 OPTIONAL MATCH (d)-[:EXTRACTED_FROM]->(pr:PullRequest)
 OPTIONAL MATCH (pr)-[:CLOSES]->(i:Issue)
 RETURN DISTINCT d.id AS id, d.title AS title, d.status AS status, c.name AS component,
-       d.source_url AS sourceUrl,
+       d.source_url AS sourceUrl, d.valid_from AS validFrom,
+       d.source_kind AS sourceKind, d.synthetic AS synthetic, d.source_channel AS sourceChannel,
        pr.id AS prId, pr.number AS prNumber, pr.url AS prUrl,
        i.id AS issueId, i.number AS issueNumber, i.url AS issueUrl, i.state AS issueState
 ORDER BY d.valid_from DESC, d.id ASC;
@@ -185,6 +190,51 @@ OPTIONAL MATCH (rev)-[:REVERTS]->(orig:PullRequest)
 RETURN rev AS node, orig AS reverted, collect(DISTINCT f.path) AS files
 ORDER BY node.merged_at DESC
 LIMIT $limit;
+`,
+
+  '10_counterfactual_impact.cypher': `// Counterfactual impact ("what if I change X?"): every component that is disturbed when the given
+// component changes, ranked for decision-making. Two directions over DEPENDS_ON, up to 3 hops:
+//   DEPENDENT  = components that depend on X (they break if X changes: dependents, not dependencies)
+//   DEPENDENCY = components X relies on (what X's change may be constrained by)
+// Each affected component carries: its shortest hop distance, its PageRank centrality
+// (algo.pageRank over DEPENDS_ON), the decisions in force at $asOf that govern it (same temporal
+// predicate as query 05) and its CODEOWNERS owner(s) of record. Row order is applied by the caller
+// (hops ASC, PageRank DESC) because ORDER BY does not span the UNION ALL.
+MATCH (x:Component {name: $component})
+MATCH p = (x)<-[:DEPENDS_ON*1..3]-(a:Component)
+WHERE a <> x
+WITH x, a, min(length(p)) AS hops
+OPTIONAL MATCH (d:Decision)-[:GOVERNS]->(a)
+WHERE d.valid_from <= $asOf AND (d.valid_to IS NULL OR d.valid_to > $asOf)
+WITH x, a, hops,
+     collect(DISTINCT CASE WHEN d IS NULL THEN null ELSE {id: d.id, title: d.title, status: d.status} END) AS decisions
+OPTIONAL MATCH (o)-[r:OWNS]->(a)
+WHERE o:Person OR o:Team
+WITH x, a, hops, decisions,
+     collect(DISTINCT CASE WHEN o IS NULL THEN null ELSE {id: o.id, name: coalesce(o.display_name, o.name, o.id), pattern: r.pattern} END) AS owners
+CALL algo.pageRank('Component', 'DEPENDS_ON') YIELD node, score
+WITH x, a, hops, decisions, owners, node, score
+WHERE node = a
+RETURN x.name AS target, a.name AS component, 'DEPENDENT' AS direction, hops, score, decisions, owners
+LIMIT 500
+UNION ALL
+MATCH (x:Component {name: $component})
+MATCH p = (x)-[:DEPENDS_ON*1..3]->(a:Component)
+WHERE a <> x
+WITH x, a, min(length(p)) AS hops
+OPTIONAL MATCH (d:Decision)-[:GOVERNS]->(a)
+WHERE d.valid_from <= $asOf AND (d.valid_to IS NULL OR d.valid_to > $asOf)
+WITH x, a, hops,
+     collect(DISTINCT CASE WHEN d IS NULL THEN null ELSE {id: d.id, title: d.title, status: d.status} END) AS decisions
+OPTIONAL MATCH (o)-[r:OWNS]->(a)
+WHERE o:Person OR o:Team
+WITH x, a, hops, decisions,
+     collect(DISTINCT CASE WHEN o IS NULL THEN null ELSE {id: o.id, name: coalesce(o.display_name, o.name, o.id), pattern: r.pattern} END) AS owners
+CALL algo.pageRank('Component', 'DEPENDS_ON') YIELD node, score
+WITH x, a, hops, decisions, owners, node, score
+WHERE node = a
+RETURN x.name AS target, a.name AS component, 'DEPENDENCY' AS direction, hops, score, decisions, owners
+LIMIT 500;
 `,
 };
 
@@ -347,4 +397,35 @@ export async function revertHistory(
   const raw = (res.data ?? []) as RevertHistoryResult;
   RevertHistoryResultSchema.parse(raw);
   return toCytoscapeElements(raw);
+}
+
+/**
+ * Counterfactual "what if I change X?": the components disturbed by a change to `component`,
+ * with hop distance, PageRank, the decisions in force at `asOf` and the owner of record.
+ * Ordered by hop distance (nearest first), then PageRank (most central first); the order is
+ * applied here because ORDER BY cannot span the query's two UNION ALL branches.
+ * An unknown component yields no rows (not an error).
+ */
+export async function counterfactualImpact(
+  client: ArgonGraphClient,
+  workspaceId: string,
+  params: CounterfactualImpactParams
+): Promise<DualPayload<CounterfactualImpactResult>> {
+  const validated = CounterfactualImpactParamsSchema.parse(params);
+  const maxDepth = Math.min(Math.max(1, validated.maxDepth), 5);
+  // maxDepth is a validated integer 1..5: safe to template (Cypher cannot parameterize path bounds)
+  const cypher = getCypherQuery('10_counterfactual_impact.cypher').replaceAll('*1..3', `*1..${maxDepth}`);
+  const res = await client.roQuery(workspaceId, cypher, {
+    component: validated.component,
+    asOf: validated.asOf,
+  });
+  const rows = CounterfactualImpactResultSchema.parse(res.data ?? []);
+  rows.sort(
+    (a, b) =>
+      a.hops - b.hops ||
+      (b.score ?? 0) - (a.score ?? 0) ||
+      a.component.localeCompare(b.component) ||
+      a.direction.localeCompare(b.direction)
+  );
+  return toCytoscapeElements(rows.slice(0, validated.limit));
 }

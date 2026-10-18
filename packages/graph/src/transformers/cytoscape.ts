@@ -192,6 +192,67 @@ export function toCytoscapeElements<T = unknown[]>(rawRecords: T): DualPayload<T
       });
     }
 
+    // 1b. Counterfactual impact row: { target, component, direction, hops, score, decisions[], owners[] }
+    //     (must precede the risk-ranking branch: it also carries component + score)
+    else if (
+      typeof record.component === 'string' &&
+      typeof record.target === 'string' &&
+      typeof record.direction === 'string' &&
+      'hops' in record
+    ) {
+      const compId = record.component;
+      const targetId = record.target;
+      if (isTopLevel) primaryIdsList.push(compId);
+      addNode({
+        id: compId,
+        label: compId,
+        type: 'Component',
+        properties: { hops: record.hops, direction: record.direction, score: record.score },
+      });
+      addNode({ id: targetId, label: targetId, type: 'Component', properties: { name: targetId } });
+      // Only the first hop is a known edge; deeper rows are connected through their predecessors.
+      if (Number(record.hops) === 1) {
+        const [source, target] = record.direction === 'DEPENDENT' ? [compId, targetId] : [targetId, compId];
+        addEdge({
+          id: `${source}->DEPENDS_ON->${target}`,
+          source,
+          target,
+          label: 'DEPENDS_ON',
+          properties: {},
+        });
+      }
+      for (const d of Array.isArray(record.decisions) ? (record.decisions as any[]) : []) {
+        if (!d || typeof d.id !== 'string' || d.id.length === 0) continue;
+        if (isTopLevel) primaryIdsList.push(d.id);
+        addNode({
+          id: d.id,
+          label: typeof d.title === 'string' && d.title ? d.title : d.id,
+          type: 'Decision',
+          properties: { id: d.id, title: d.title, status: d.status },
+        });
+        addEdge({ id: `${d.id}->GOVERNS->${compId}`, source: d.id, target: compId, label: 'GOVERNS', properties: {} });
+      }
+      for (const o of Array.isArray(record.owners) ? (record.owners as any[]) : []) {
+        if (!o || typeof o.id !== 'string' || o.id.length === 0) continue;
+        if (isTopLevel) primaryIdsList.push(o.id);
+        addNode({
+          id: o.id,
+          label: typeof o.name === 'string' && o.name ? o.name : o.id,
+          type: o.id.startsWith('@') && o.id.includes('/') ? 'Team' : 'Person',
+          properties: { id: o.id, display_name: o.name },
+        });
+        addEdge({
+          id: `${o.id}->OWNS->${compId}`,
+          source: o.id,
+          target: compId,
+          label: 'OWNS',
+          properties: { pattern: o.pattern },
+        });
+      }
+      // Nested decisions/owners were handled above: do not walk into them again.
+      return;
+    }
+
     // 2. Risk ranking row: { component, score }
     else if (typeof record.component === 'string' && typeof record.score === 'number' && !record.authorId) {
       const compId = record.component;
