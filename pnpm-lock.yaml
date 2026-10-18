@@ -479,6 +479,9 @@ importers:
       '@argon/graph':
         specifier: workspace:*
         version: link:../graph
+      '@argon/ingest':
+        specifier: workspace:*
+        version: link:../ingest
       cli-table3:
         specifier: ^0.6.5
         version: 0.6.5

@@ -61,8 +61,8 @@ flowchart TD
     subgraph GatewayLayer ["Query Gateway & Named Queries"]
         Gateway["Cloud Run Query Gateway<br/>(apps/gateway - Hono)"]
         Direct["Direct In-Process Client<br/>(@argon/graph)"]
-        MCP["MCP Server (apps/mcp, stdio)<br/>12 tools for Claude Code / Cursor"]
-        Queries["9 Parameterized openCypher Queries<br/>(packages/graph/queries/*.cypher)"]
+        MCP["MCP Server (apps/mcp, stdio)<br/>13 tools for Claude Code / Cursor"]
+        Queries["10 Parameterized openCypher Queries<br/>(packages/graph/queries/*.cypher)"]
         Gateway --> Queries
         Direct --> Queries
         MCP --> Direct
@@ -118,7 +118,8 @@ flowchart TD
 |  packages/graph & apps/gateway (Hono on Cloud Run)                                    |
 |  01_resolve_scope       02_blast_radius      03_risk_ranking     04_who_knows          |
 |  05_constraining_decisions                  06_precedent_search                       |
-|  07_path_between        08_component_overview      09_revert_history              |
+|  07_path_between        08_component_overview      09_revert_history                  |
+|  10_counterfactual_impact                                                             |
 +-------------------------------------------+-------------------------------------------+
                                             | openCypher (RO_QUERY)
                                             v
@@ -147,7 +148,7 @@ graph LR
     Issue["(:Issue)<br/><i>id, number, title, state, url</i>"]:::nodeStyle
     File["(:File)<br/><i>path, extension</i>"]:::nodeStyle
     Component["(:Component)<br/><i>name</i>"]:::nodeStyle
-    Decision["(:Decision)<br/><i>id, title, status, source_kind, source_url,<br/>valid_from, valid_to, embedding</i>"]:::nodeStyle
+    Decision["(:Decision)<br/><i>id, title, status, source_kind, source_url,<br/>valid_from, valid_to, embedding, synthetic?</i>"]:::nodeStyle
     Briefing["(:Briefing)<br/><i>id, task, created_at</i>"]:::nodeStyle
 
     Person -->|:AUTHORED| PR
@@ -192,6 +193,7 @@ Per Hackathon Judging Rule 1, Argon uses FalkorDB as a core computational graph 
 | **Precedent & Revert Search** | FalkorDB native vector index (`db.idx.vector.queryNodes`) coupled with graph expansion to the governed component, the PR the decision was extracted from and the issue that PR closed | [`06_precedent_search.cypher`](packages/graph/queries/06_precedent_search.cypher) | Vector DBs return isolated chunks without provenance; FalkorDB executes vector search and immediately joins the governing component and PR. |
 | **Learning Paths & Impact Chains** | Shortest Path traversal (`algo.SPpaths`) between unknown and familiar components | [`07_path_between.cypher`](packages/graph/queries/07_path_between.cypher) | Computes the shortest architectural trajectory through the codebase; fundamentally graph-native. |
 | **Revert History** | Traversal `(:PullRequest {is_revert})-[:TOUCHES]->(:File)` plus `[:REVERTS]` to the change that was reverted | [`09_revert_history.cypher`](packages/graph/queries/09_revert_history.cypher) | A revert on the same files is the strongest "this area has bitten us" signal; it is a relationship between commits and files, not a document. |
+| **Counterfactual "What If I Change X?"** | Two-direction variable-length traversal over `[:DEPENDS_ON*1..N]` (dependents that break, dependencies relied on), joined with `algo.pageRank` centrality, the in-force decisions (same temporal predicate as query 05) and the CODEOWNERS owner of each affected component | [`10_counterfactual_impact.cypher`](packages/graph/queries/10_counterfactual_impact.cypher) | One ranked, decision-grade answer needs traversal + a global graph algorithm + temporal filtering in a single query; SQL would need recursive CTEs plus a separate PageRank job. |
 | **Graph-Driven Verdict** | Deterministic PROCEED / REVIEW / HOLD from revert history, superseded precedents, PageRank rank and blast radius | [`packages/agent/src/verdict/verdict.ts`](packages/agent/src/verdict/verdict.ts) | Every rule cites the graph nodes it rests on; the LLM never decides the verdict. |
 | **Agent Write-Back Memory** | Transactional graph creation of `(:Briefing)` nodes with `[:CITES]` and `[:ABOUT]` edges | [`packages/agent/src/memory/record-outcome.ts`](packages/agent/src/memory/record-outcome.ts) | Preserves briefing lineage directly within the knowledge graph for subsequent briefing context. |
 | **Fail-Closed Kill Switch** | "No graph, no answer" refusal when FalkorDB is unreachable or graph entities are absent | [`scripts/demo-check.ts`](scripts/demo-check.ts) | Proves strict dependency on the graph. Halting FalkorDB causes instant refusal rather than fallback to ungrounded LLM babble. |
@@ -284,6 +286,7 @@ One definition ([`packages/agent/src/tools/toolbox.ts`](packages/agent/src/tools
 | `blast_radius` | Multi-hop `DEPENDS_ON*1..N` traversal |
 | `risk_ranking` | `algo.pageRank` over component dependencies |
 | `path_between` | `algo.SPpaths` shortest dependency path |
+| `counterfactual_impact` | "What if I change X?": dependents/dependencies up to N hops, ranked by distance then PageRank, with in-force decisions and owner of record |
 | `who_knows` | Authorship (and reviews, where recorded) per component |
 | `constraining_decisions` | Temporal predicate: decisions in force at `asOf` |
 | `precedent_search` | 512-d vector index + graph expansion (text is embedded for you) |
@@ -292,7 +295,7 @@ One definition ([`packages/agent/src/tools/toolbox.ts`](packages/agent/src/tools
 | `record_outcome` | Write-back `(:Briefing)` memory with `[:CITES]` / `[:ABOUT]` |
 | `list_workspaces` | Discover graphs on the connected FalkorDB |
 
-There is deliberately **no free-form Cypher tool**: only the nine reviewed, parameterized queries can run. Query tools are read-only (`GRAPH.RO_QUERY`); if FalkorDB is unreachable a tool returns `isError` with `NO GRAPH, NO ANSWER`, never an ungrounded answer.
+There is deliberately **no free-form Cypher tool**: only the ten reviewed, parameterized queries can run. Query tools are read-only (`GRAPH.RO_QUERY`); if FalkorDB is unreachable a tool returns `isError` with `NO GRAPH, NO ANSWER`, never an ungrounded answer.
 
 ### Use from Claude Code / Cursor
 
@@ -339,6 +342,12 @@ pnpm demo:check        # includes: verdict + trace check, and graph tools called
 
 ---
 
+### Explainability extras
+
+- **Click a verdict reason, see it on the graph.** Every node id a verdict reason rests on is a button; clicking it (or "Show on graph" for the whole reason) lights up those nodes and their edges on the canvas, using the same focus mechanism as the citation chips. Ids that are not drawn (for example a revert pull request) are ignored. Not drawn on the canvas today: revert PRs.
+- **Counterfactual impact.** `counterfactual_impact` answers "if I change this component, what do I disturb, nearest and most central first?" It is available to the LLM planner and over MCP, not run on every briefing.
+- **Learning path.** When the planner runs `path_between` (for example for "I'm new to X, how does it reach Y?"), the briefing shows the walk as an ordered **learning path**: each hop is a component the previous one depends on, annotated with the decisions in force, the owner of record and its PageRank. It needs the LLM planner (a Gemini key); a direction with no path shows a "no dependency path" state.
+
 ## 🧠 Company Brain: Provenance, Reviews & Ownership (Track 3)
 
 Code, decisions, pull requests, reviews, issues and owners live in one graph, and every answer links back to where it came from.
@@ -351,6 +360,7 @@ Code, decisions, pull requests, reviews, issues and owners live in one graph, an
 | **Owner of record** | `CODEOWNERS` (`.github/`, root or `docs/`; last matching rule wins) | `(:Person\|:Team)-[:OWNS {pattern, coverage}]->(:Component)` |
 | **Pull requests, reviews** | GitHub API: merged PRs (latest 200) and their reviews | `(:Person)-[:REVIEWED {state, count}]->(:PullRequest)`; PR `number`, `url`, `state` |
 | **Issues** | GitHub API: latest 200 issues + issues PRs say they close | `(:Issue)`, `(:PullRequest)-[:CLOSES]->(:Issue)` (from `Fixes #n`), `(:Issue)-[:AFFECTS]->(:Component)` (through the closing PR's files) |
+| **Decisions agreed in chat (synthetic demo data)** | `synthetic: true` JSON of decision threads, seeded into `synthetic-demo` / `argon-dogfood` only | `(:Decision {source_kind: 'chat', synthetic: true})`, `GOVERNS` / `SUPERSEDES` / `EXTRACTED_FROM` |
 | **Decisions stated in review comments** | PR review bodies and descriptions with explicit decision language ("we decided to...") | `(:Decision {source_kind: 'comment'})`, linked to the comment |
 
 **How it behaves**
@@ -360,13 +370,17 @@ Code, decisions, pull requests, reviews, issues and owners live in one graph, an
 - **Keeping it current without webhooks.** The **Re-sync** button next to your ingested workspaces (`POST /api/v1/workspaces/:id/refresh`, owner only) re-mines git history and reads GitHub PRs/issues changed since the last completed ingestion. Everything is an idempotent `MERGE`; the gateway then broadcasts `sync:complete` with what was added, so open briefings that cite changed files or superseded decisions show the "repository updated" banner.
 - **Answers with sources.** A briefing response carries `sources` (commit / ADR / PR / issue URLs read from graph properties, never from the model) and `codeOwners`. The UI shows, under each decision and precedent, the PR and issue it was extracted from, links PR/issue ids the narrator cites, shows reviewer counts, and flags the CODEOWNERS owner of record. Cited PR/issue ids go through the same fail-closed citation check as every other id.
 
+**Chat as a source (synthetic).** Track 3 names docs, tickets *and chats*, and Argon has no Slack/Teams connector. To show the shape, `packages/ingest/src/chat/` reads a JSON file of decision threads that **must declare `"synthetic": true`** (anything else is rejected) and writes them as `(:Decision {source_kind: 'chat', synthetic: true})` with `GOVERNS`, `SUPERSEDES` and `EXTRACTED_FROM` edges, idempotently. `synthetic-demo` and `argon-dogfood` carry a few **invented** threads (for example `CHAT-002`, a billing retry budget "agreed in #payments-eng" that replaced `CHAT-001`); briefings label them "Chat thread #channel (synthetic)". Ember is untouched.
+
+**Freshness.** A briefing also reports how old the decisions it cites are: "N of M cited decisions have been in force for more than 180 days", with a "Stale · Nd" badge on those cards. Age is measured from the decision's `valid_from` (the nearest thing the graph has to "last touched"); the threshold is a heuristic.
+
 **Try it (no OAuth needed).** After `pnpm seed:showcase`, open workspace `synthetic-demo` and ask *"Refactor billing/retry.ts"*: `DEC-002` shows `PR #42` and `Issue #1042` (closed), Carol appears as a reviewer of two billing PRs, and `@synthetic-demo/payments` is the owner of record. **That data is synthetic** (invented people, a fictional `argon/synthetic-demo` repository whose links do not resolve). The Ember corpus is deliberately left as is, because it mirrors a real project and we do not attach invented reviewers to it.
 
 **Honest limits**
 - Reviews and issues exist only for repositories ingested **with GitHub access** (github.com URL; signed-in for private repos). Local paths and other hosts get git-derived knowledge only (authors, decisions, provenance, CODEOWNERS).
 - Merged PRs are read from the latest 200 (25 anonymously). Merge commits that are not on the mined branch (for example PRs merged into a `develop` branch while `master` is cloned) become `pr_gh_<n>` nodes; their changed files are read when a token is available, otherwise their reviews are stored but not attributed to components.
 - Re-sync re-mines the git window in full (components and coupling weights are derived from the whole window); only GitHub activity is incremental.
-- Slack/Notion-style chat sources are out of scope: the "chat" source is PR review text.
+- There is no real Slack/Notion/Teams integration: chat is PR review text (real) plus the clearly labelled synthetic chat threads described above.
 
 ## 🔬 Benchmark Reproduction & Monorepo Tooling
 
@@ -380,7 +394,7 @@ pnpm --filter @argon/eval bench:graph
 # Run dual no-graph baseline benchmarks
 pnpm --filter @argon/eval bench:baseline
 
-# Run full monorepo test suite (676 tests across 7 suites)
+# Run full monorepo test suite (852 tests across 7 suites)
 pnpm test
 
 # Typecheck all packages
@@ -417,7 +431,7 @@ argon/
 │   └── mcp/                     # MCP server (stdio): the graph tools for Claude Code / Cursor
 ├── packages/
 │   ├── agent/                   # Briefing orchestration, narration, & citation verification
-│   ├── graph/                   # FalkorDB SDK, 9 openCypher queries, & Matryoshka embedder
+│   ├── graph/                   # FalkorDB SDK, 10 openCypher queries, & Matryoshka embedder
 │   ├── ingest/                  # Git miner, ADR parser, & graph populator
 │   └── eval/                    # Revert backtest harness, dual baselines, & seed datasets
 ├── scripts/
