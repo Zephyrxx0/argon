@@ -92,7 +92,7 @@ services:
     environment:
       - FALKORDB_URL=redis://falkordb:6379
     command: >
-      sh -c "npm install -g pnpm@12.10.1 && pnpm --filter @argon/eval seed"
+      sh -c "npm install -g pnpm@12.10.1 && pnpm build --filter=@argon/eval... && pnpm --filter @argon/eval seed"
     depends_on:
       falkordb:
         condition: service_healthy
