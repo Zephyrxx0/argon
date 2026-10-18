@@ -285,7 +285,6 @@ Per Hackathon Judging Rule 1, Argon uses FalkorDB as a core computational graph 
 ---
 
 ## 📊 Empirical Benchmark Results (EVAL-01)
-## 🚀 Quick Start (Under 60 Seconds)
 
 Argon was rigorously evaluated against a dual no-graph baseline across a curated golden fixture dataset of **24 real-world and synthetic historical git revert cases** (`packages/eval/fixtures/reverts.json`), covering `synthetic-demo`, `ember-adr-showcase`, and `argon-dogfood`.
 
@@ -313,37 +312,84 @@ Argon was rigorously evaluated against a dual no-graph baseline across a curated
 
 ---
 
-## ⏱ 2-Minute Judge Walkthrough Script (PRD §17)
+## 🚀 Setup
 
-Follow this step-by-step walkthrough to reproduce Argon's core scenarios locally in under two minutes:
+### Prerequisites
 
-### 1. Start Database & Seed Curated Showcases (10 seconds)
-### 1. Start FalkorDB & Seed Demo Showcases
+- Node.js 20 or newer and [pnpm](https://pnpm.io/installation) (the repository pins pnpm 12.10.1).
+- Docker with Docker Compose.
+- A Gemini API key for live narration and embeddings. The app can still run without it, with reduced LLM features.
+- GitHub OAuth credentials only if you want to sign in with GitHub and browse or ingest private repositories. Public Git URL ingestion does not require sign-in.
+
+### Install
+
 ```bash
-# 1. Start FalkorDB container
-docker compose up -d
+git clone https://github.com/argon/argon.git
+cd argon
+pnpm install
+```
 
-# 2. Seed the triad showcase corpus into FalkorDB (<5 seconds)
-# 2. Seed showcase workspaces (<5 seconds)
+### Configure
+
+Create a root `.env` file and provide the credentials you need:
+
+```dotenv
+FALKORDB_URL=falkor://localhost:6379
+GEMINI_API_KEY=your-gemini-api-key
+BETTER_AUTH_SECRET=replace-with-a-long-random-secret
+GITHUB_CLIENT_ID=your-github-oauth-client-id
+GITHUB_CLIENT_SECRET=your-github-oauth-client-secret
+```
+
+`GEMINI_API_KEY` is optional for basic graph use, but required for full narration and Gemini embedding fallback. `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` are needed for GitHub sign-in; configure the OAuth app callback URL for your local app at `http://localhost:3000/api/auth/callback/github`. For deployed setup and callback details, see [deploy/README.md](deploy/README.md).
+
+### Start the database and demo data
+
+```bash
+docker compose up -d
 pnpm seed:showcase
 ```
 
-### 2. Run Automated Demo Smoke Test (5 seconds)
-```bash
-# Validates DB ping, seed counts, S1 briefing, 100% citation integrity, and kill switch
-# 3. Run automated demo smoke test
-pnpm demo:check
-```
+### Run the app
 
-### 3. Launch Web Application
-### 2. Launch the Web App
 ```bash
 pnpm dev
 ```
-Open [http://localhost:3000](http://localhost:3000) for the landing page; the app lives at [/workspace](http://localhost:3000/workspace).
-Open [http://localhost:3000](http://localhost:3000) for the landing page or [http://localhost:3000/workspace](http://localhost:3000/workspace) to start querying.
 
-### 4. Interactive Scenarios to Explore
+Open [http://localhost:3000/workspace](http://localhost:3000/workspace). To verify the seeded demo and graph connection, run `pnpm demo:check`.
+
+### Ingest a repository
+
+In the workspace header, open the workspace switcher and choose **Ingest Repository**. Then either:
+
+- Paste a public HTTPS Git repository URL, such as `https://github.com/owner/repository`, and start ingestion. This path works without GitHub sign-in.
+- Choose **Sign in with GitHub** to browse repositories available to your GitHub account, including private repositories, then select one to ingest. GitHub access is read-only; Argon does not push changes.
+
+After ingestion completes, Argon adds the repository as a workspace. GitHub PR, review, and issue enrichment is best effort; private repositories use your signed-in OAuth access. See [Company Brain: Provenance, Reviews & Ownership](#-company-brain-provenance-reviews--ownership-track-3) for coverage and limits.
+
+---
+
+## ⏱ 2-Minute Judge Walkthrough Script (PRD §17)
+
+Follow this step-by-step walkthrough to reproduce Argon's core scenarios locally:
+
+### 1. Start FalkorDB and seed demo workspaces
+```bash
+docker compose up -d
+pnpm seed:showcase
+```
+
+### 2. Start the web app
+```bash
+pnpm dev
+```
+Open [http://localhost:3000/workspace](http://localhost:3000/workspace).
+
+### 3. (Optional) Ingest your own repository
+- Choose **Ingest Repository** from the workspace switcher and paste a public HTTPS Git URL; or
+- Click **Sign in with GitHub**, then select a public or private repository visible to your account.
+
+### 4. Explore the demo scenarios
 - **Scenario S1: Before Changing Code ("Refactor billing/retry.ts")**
   - Switch to workspace **`synthetic-demo`** in the header.
   - In the command bar (`Cmd+K`), type: `"Refactor billing/retry.ts"`.
@@ -358,11 +404,6 @@ Open [http://localhost:3000](http://localhost:3000) for the landing page or [htt
   - Stop FalkorDB: `docker compose down`.
   - Submit any query in the command bar.
   - **What to observe**: Argon refuses to answer with an ungrounded LLM hallucination, displaying the red **"No graph, no answer"** kill-switch card.
-### 3. Try These Scenarios
-- **Refactor billing:** Switch to `synthetic-demo` and search `"Refactor billing/retry.ts"`. Observe how Argon flags that `DEC-001` was superseded by `DEC-002` after Revert #42.
-- **Onboarding:** Search `"I want to work on the auth layer"` to calculate blast radius, find domain experts (Alice / Bob), and view starter issues.
-- **Kill-Switch Test:** Stop FalkorDB (`docker compose down`) and run any query. Argon displays the red **"No graph, no answer"** card rather than hallucinating.
-
 ---
 
 ## 🔌 Agent Tools, Tool Selection & MCP (Track 1)
