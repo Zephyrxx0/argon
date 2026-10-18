@@ -2,6 +2,7 @@
 
 > **Context for AI Agents & Engineers** — *"What must I know before I touch this?"*  
 > An evidence-backed architectural briefing engine grounded in the FalkorDB knowledge graph.  
+> An evidence-backed architectural briefing engine grounded in the **FalkorDB** knowledge graph.  
 > **"No graph, no answer."**
 
 [![FalkorDB Hackathon 2026](https://img.shields.io/badge/FalkorDB-Hackathon_2026-00F0FF?style=for-the-badge&logo=redis)](https://falkordb.com)
@@ -12,16 +13,48 @@
 ---
 
 ## ⚡ Overview & Key Highlights
+## 🎬 Video Walkthrough & Demo
 
 Argon is an architectural memory and context agent for software engineering teams. Before an engineer or coding agent modifies code, Argon answers the critical question: **"What must I know before I touch this?"**
+[![Argon Demo Video](https://img.youtube.com/vi/ODa0sN3h-gY/maxresdefault.jpg)](https://youtu.be/ODa0sN3h-gY)
 
 Instead of naive vector retrieval that hallucinates obsolete conventions or relational databases that struggle with multi-hop dependencies, Argon queries an **openCypher knowledge graph in FalkorDB**. Every blast radius calculation, reviewer recommendation, architectural constraint, and historical precedent is mathematically computed through graph traversals, PageRank centrality, and temporal `$asOf` predicates.
+> 📺 **Watch the complete demo & deep dive:** [https://youtu.be/ODa0sN3h-gY](https://youtu.be/ODa0sN3h-gY)
 
 ### Key Benchmark Metrics (EVAL-01)
 - **+58.3% Recall@1 Advantage**: **62.5%** for Argon vs **4.2%** for Naive Vector RAG on historical revert backtests (Recall@3 **95.8%**, Recall@5 **100%**).
 - **0.0% Superseded Hallucinations**: FalkorDB temporal validity windows (`valid_from <= $asOf < valid_to`) completely eliminate obsolete architectural guidance (vs 54.2% hallucinations in raw LLMs).
 - **2ms Query Latency**: Instant openCypher query evaluation on Node.js CPU.
 - **100% Fail-Closed Citation Integrity**: Every single claim cites a verified FalkorDB node `#id`. Uncited claims are stripped; zero verified citations triggers an automatic refusal: **"No graph, no answer."**
+---
+
+## ⚡ The Problem: Why Vector RAG Fails in Codebases
+
+Before modifying an unfamiliar service, engineers and coding agents face a critical question: **"What must I know before I touch this?"**
+
+- **Semantic Similarity is Time-Blind**: Searching for retry logic retrieves `DEC-001` (linear retry) because keywords match, completely unaware that `DEC-002` superseded it after Revert #42.
+- **Relational Databases Struggle with Cascades**: Computing transitive blast radii across multi-hop dependencies requires costly recursive SQL joins that buckle under cycles.
+- **Institutional Context is Siloed**: Commits, PR reviews, CODEOWNERS, and ADRs live in separate systems with no unified provenance.
+
+### The Argon Solution
+Argon models software repositories as an active **openCypher property graph in FalkorDB**. Every blast radius calculation, reviewer recommendation, architectural constraint, and historical precedent is computed mathematically using graph traversals, PageRank centrality, and temporal validity predicates (`valid_from <= $asOf < valid_to`).
+
+---
+
+## 📊 Benchmark Highlights (EVAL-01)
+
+Tested on 24 historical revert scenarios across real-world and synthetic repositories (`packages/eval/fixtures/reverts.json`):
+
+| Metric | Naive Vector RAG | Raw LLM (Gemma 4) | Argon (FalkorDB) | Delta vs Baseline |
+|---|---|---|---|---|
+| **Recall@1** | 4.2% | 16.7% | **62.5%** | **+58.3%** |
+| **Recall@3** | 8.3% | 33.3% | **95.8%** | **+87.5%** |
+| **Recall@5** | 29.2% | 41.7% | **100.0%** | **+70.8%** |
+| **Superseded Hallucinations** | 12.5% | 54.2% | **0.0% (Clean)** | **-12.5%** |
+| **Avg Query Latency** | 123ms | Replay-cached | **2ms** | **Instant** |
+
+- **Zero Superseded Hallucinations**: Temporal graph filtering guarantees obsolete architectural guidance is never returned.
+- **100% Fail-Closed Citation Integrity**: Every claim cites verified FalkorDB node IDs. If the graph is unreachable or unverified, Argon refuses to answer: **"No graph, no answer."**
 
 ---
 
@@ -35,6 +68,10 @@ flowchart TD
         Web["Next.js 15 Web App<br/>(Tailwind CSS / brutalist monochrome)"]
         Canvas["React Flow Graph Canvas<br/>(dagre layout / hover + citation focus)"]
         CmdK["Dual Command Palette<br/>(Header & Cmd+K)"]
+    subgraph UI ["Client & Visualization"]
+        Web["Next.js 15 Web App"]
+        Canvas["React Flow Graph Canvas (Live Citations)"]
+        CmdK["Command Bar (Cmd+K)"]
         Web --> Canvas
         Web --> CmdK
     end
@@ -56,6 +93,13 @@ flowchart TD
         Verdict --> Narrator
         Narrator --> Validator
         Validator --> Memory
+    subgraph Agent ["Agent Engine (@argon/agent)"]
+        Pipeline["Briefing Pipeline"]
+        Planner["LLM Tool Planner (Budgeted)"]
+        Verdict["Deterministic Verdict (PROCEED / REVIEW / HOLD)"]
+        Validator["Fail-Closed Citation Kill Switch"]
+        Memory["Write-Back Memory (:Briefing Nodes)"]
+        Pipeline --> Planner --> Verdict --> Validator --> Memory
     end
 
     subgraph GatewayLayer ["Query Gateway & Named Queries"]
@@ -63,6 +107,11 @@ flowchart TD
         Direct["Direct In-Process Client<br/>(@argon/graph)"]
         MCP["MCP Server (apps/mcp, stdio)<br/>13 tools for Claude Code / Cursor"]
         Queries["10 Parameterized openCypher Queries<br/>(packages/graph/queries/*.cypher)"]
+    subgraph QueryLayer ["Query Gateway & MCP"]
+        MCP["MCP Server (stdio, 13 Tools)"]
+        Gateway["Cloud Run Query Gateway (Hono)"]
+        Queries["10 Parameterized openCypher Queries"]
+        MCP --> Queries
         Gateway --> Queries
         Direct --> Queries
         MCP --> Direct
@@ -75,6 +124,11 @@ flowchart TD
         VectorIdx["512-d Matryoshka Vector Index<br/>(EmbeddingGemma-2 on CPU)"]
         Algo["Graph Algorithms<br/>(PageRank, SPpaths)"]
         
+    subgraph DB ["FalkorDB Engine"]
+        Falkor[("FalkorDB Graph Engine")]
+        GraphNodes["Nodes: Component, File, Decision, PR, Person, Issue"]
+        VectorIdx["512-d Matryoshka Vector Index (CPU)"]
+        Algo["Graph Algorithms (PageRank, SPpaths)"]
         Falkor --> GraphNodes
         Falkor --> GraphEdges
         Falkor --> VectorIdx
@@ -94,9 +148,11 @@ flowchart TD
     CmdK -->|POST /api/briefing| Pipeline
     Dispatcher --> Gateway
     Dispatcher --> Direct
+    Planner --> Queries
     Queries --> Falkor
     Validator -->|Verified Citations| Canvas
     Memory -->|Briefing Node & CITES Edges| Falkor
+    Validator -->|Verified Nodes| Canvas
 ```
 
 ```
@@ -134,13 +190,23 @@ flowchart TD
 ---
 
 ## 📐 openCypher Graph Schema
+## 📐 Graph Schema
 
 Argon models the dynamic architecture of a software repository across time and contributors.
+Argon models the dynamic architecture of a software repository across time, code, and contributors:
 
 ```mermaid
 graph LR
     classDef nodeStyle fill:#0f172a,stroke:#00f0ff,stroke-width:2px,color:#fff;
     classDef edgeStyle stroke:#ffb800,stroke-width:1px,color:#ffb800;
+    Person["(:Person)"]:::nodeStyle
+    Team["(:Team)"]:::nodeStyle
+    PR["(:PullRequest)"]:::nodeStyle
+    Issue["(:Issue)"]:::nodeStyle
+    File["(:File)"]:::nodeStyle
+    Component["(:Component)"]:::nodeStyle
+    Decision["(:Decision)"]:::nodeStyle
+    Briefing["(:Briefing)"]:::nodeStyle
 
     Person["(:Person)<br/><i>id, name, github_login</i>"]:::nodeStyle
     Team["(:Team)<br/><i>id (@org/team), name</i>"]:::nodeStyle
@@ -155,6 +221,8 @@ graph LR
     Person -->|:REVIEWED| PR
     PR -->|:TOUCHES| File
     PR -->|:REVERTS| PR
+    PR -->|:CLOSES| Issue
+    Issue -->|:AFFECTS| Component
     File -->|:IN_COMPONENT| Component
     Component -->|:DEPENDS_ON| Component
     Decision -->|:GOVERNS| Component
@@ -177,14 +245,22 @@ graph LR
 - **`(:Person)`**: Committer identity with irreversible privacy hashing (`id: String`, `name: String`, `email_hash: String`). A GitHub login is mapped onto the git author it belongs to (`github_login`); a reviewer who never committed gets `id: gh_<login>`. Bots are never people.
 - **`(:Team)`**: A CODEOWNERS team handle (`@org/team`).
 - **`(:Briefing)`**: Write-back memory nodes recording agent sessions (`id: String`, `task: String`, `created_at: Integer`).
+### Core Entity Invariants
+- **`(:Component)`**: Architectural boundaries with PageRank centrality computed dynamically.
+- **`(:Decision)`**: ADRs/RFCs with temporal windows (`valid_from`, `valid_to`) and 512-d vector embeddings.
+- **`(:PullRequest)` & `(:Issue)`**: Git commits enriched with merged PR metadata, review counts, and issue linkages.
+- **`(:Person)` & `(:Team)`**: Commit authors, PR reviewers (privacy-hashed emails), and CODEOWNERS records.
+- **`(:Briefing)`**: Write-back memory nodes recording agent briefings and cited decisions.
 
 ---
 
 ## 🔍 The "Graph Does Real Work" Compliance Table (§7.4)
+## 🔍 How FalkorDB Does the Real Work
 
 Per Hackathon Judging Rule 1, Argon uses FalkorDB as a core computational graph engine, not a passive document store. Every headline feature depends on graph-native algorithms, multi-hop traversals, or vector-topology expansion:
 
 | Headline Capability | FalkorDB Core Engine Mechanism | openCypher Named Query | Why Impossible in Relational / Flat Vector Alone |
+| Capability | FalkorDB Mechanism | Named openCypher Query | Why Graph-Native |
 |---|---|---|---|
 | **Blast Radius Analysis** | Variable-length topological expansion over `[:TOUCHES]`, `[:IN_COMPONENT]`, and `[:DEPENDS_ON]*1..3` | [`02_blast_radius.cypher`](packages/graph/queries/02_blast_radius.cypher) | Relational SQL requires costly recursive CTEs with quadratic join complexity; flat vector search cannot evaluate transitive structural dependencies. |
 | **Architectural Risk Ranking** | Native PageRank centrality algorithm (`algo.pageRank`) executed over component dependency graph | [`03_risk_ranking.cypher`](packages/graph/queries/03_risk_ranking.cypher) | Requires global topological iterative graph processing across all directed edges; impossible in vector search and intractable in flat SQL. |
@@ -197,10 +273,19 @@ Per Hackathon Judging Rule 1, Argon uses FalkorDB as a core computational graph 
 | **Graph-Driven Verdict** | Deterministic PROCEED / REVIEW / HOLD from revert history, superseded precedents, PageRank rank and blast radius | [`packages/agent/src/verdict/verdict.ts`](packages/agent/src/verdict/verdict.ts) | Every rule cites the graph nodes it rests on; the LLM never decides the verdict. |
 | **Agent Write-Back Memory** | Transactional graph creation of `(:Briefing)` nodes with `[:CITES]` and `[:ABOUT]` edges | [`packages/agent/src/memory/record-outcome.ts`](packages/agent/src/memory/record-outcome.ts) | Preserves briefing lineage directly within the knowledge graph for subsequent briefing context. |
 | **Fail-Closed Kill Switch** | "No graph, no answer" refusal when FalkorDB is unreachable or graph entities are absent | [`scripts/demo-check.ts`](scripts/demo-check.ts) | Proves strict dependency on the graph. Halting FalkorDB causes instant refusal rather than fallback to ungrounded LLM babble. |
+| **Blast Radius** | Variable-length traversal over `[:TOUCHES]`, `[:IN_COMPONENT]`, and `[:DEPENDS_ON*1..3]` | [`02_blast_radius.cypher`](packages/graph/queries/02_blast_radius.cypher) | Traverses transitive dependencies without recursive SQL join explosion. |
+| **Risk Ranking** | Native PageRank (`algo.pageRank`) executed on component dependency graph | [`03_risk_ranking.cypher`](packages/graph/queries/03_risk_ranking.cypher) | Global topological centrality evaluated in real-time. |
+| **Expert Discovery** | Dual-branch aggregation over `[:AUTHORED]`, `[:REVIEWED]`, and `[:OWNS]` | [`04_who_knows.cypher`](packages/graph/queries/04_who_knows.cypher) | Identifies true maintainers and reviewers without row-inflation or tenure bias. |
+| **Temporal Validity** | Temporal predicate rewinding (`valid_from <= $asOf < valid_to`) across `[:SUPERSEDES]` | [`05_constraining_decisions.cypher`](packages/graph/queries/05_constraining_decisions.cypher) | Completely eliminates obsolete ADR hallucinations. |
+| **Precedent Search** | FalkorDB vector index (`db.idx.vector.queryNodes`) + immediate multi-hop expansion | [`06_precedent_search.cypher`](packages/graph/queries/06_precedent_search.cypher) | Joins vector similarity with governing components and PR provenance in one query. |
+| **Learning Paths** | Shortest path traversal (`algo.SPpaths`) between components | [`07_path_between.cypher`](packages/graph/queries/07_path_between.cypher) | Synthesizes an ordered onboarding trajectory through dependencies. |
+| **Revert History** | Traversal `(:PullRequest {is_revert})-[:TOUCHES]->(:File)` and `[:REVERTS]` | [`09_revert_history.cypher`](packages/graph/queries/09_revert_history.cypher) | Detects recurring bug hotspots directly on touched files. |
+| **Deterministic Verdict** | Computed strictly from revert history, blast radius, and PageRank | [`packages/agent/src/verdict/`](packages/agent/src/verdict/verdict.ts) | Assigns `PROCEED`, `REVIEW`, or `HOLD` backed by verified graph node IDs. |
 
 ---
 
 ## 📊 Empirical Benchmark Results (EVAL-01)
+## 🚀 Quick Start (Under 60 Seconds)
 
 Argon was rigorously evaluated against a dual no-graph baseline across a curated golden fixture dataset of **24 real-world and synthetic historical git revert cases** (`packages/eval/fixtures/reverts.json`), covering `synthetic-demo`, `ember-adr-showcase`, and `argon-dogfood`.
 
@@ -233,25 +318,30 @@ Argon was rigorously evaluated against a dual no-graph baseline across a curated
 Follow this step-by-step walkthrough to reproduce Argon's core scenarios locally in under two minutes:
 
 ### 1. Start Database & Seed Curated Showcases (10 seconds)
+### 1. Start FalkorDB & Seed Demo Showcases
 ```bash
 # 1. Start FalkorDB container
 docker compose up -d
 
 # 2. Seed the triad showcase corpus into FalkorDB (<5 seconds)
+# 2. Seed showcase workspaces (<5 seconds)
 pnpm seed:showcase
 ```
 
 ### 2. Run Automated Demo Smoke Test (5 seconds)
 ```bash
 # Validates DB ping, seed counts, S1 briefing, 100% citation integrity, and kill switch
+# 3. Run automated demo smoke test
 pnpm demo:check
 ```
 
 ### 3. Launch Web Application
+### 2. Launch the Web App
 ```bash
 pnpm dev
 ```
 Open [http://localhost:3000](http://localhost:3000) for the landing page; the app lives at [/workspace](http://localhost:3000/workspace).
+Open [http://localhost:3000](http://localhost:3000) for the landing page or [http://localhost:3000/workspace](http://localhost:3000/workspace) to start querying.
 
 ### 4. Interactive Scenarios to Explore
 - **Scenario S1: Before Changing Code ("Refactor billing/retry.ts")**
@@ -268,13 +358,19 @@ Open [http://localhost:3000](http://localhost:3000) for the landing page; the ap
   - Stop FalkorDB: `docker compose down`.
   - Submit any query in the command bar.
   - **What to observe**: Argon refuses to answer with an ungrounded LLM hallucination, displaying the red **"No graph, no answer"** kill-switch card.
+### 3. Try These Scenarios
+- **Refactor billing:** Switch to `synthetic-demo` and search `"Refactor billing/retry.ts"`. Observe how Argon flags that `DEC-001` was superseded by `DEC-002` after Revert #42.
+- **Onboarding:** Search `"I want to work on the auth layer"` to calculate blast radius, find domain experts (Alice / Bob), and view starter issues.
+- **Kill-Switch Test:** Stop FalkorDB (`docker compose down`) and run any query. Argon displays the red **"No graph, no answer"** card rather than hallucinating.
 
 ---
 
 ## 🔌 Agent Tools, Tool Selection & MCP (Track 1)
+## 🔌 Model Context Protocol (MCP) for AI Agents
 
 Argon's graph queries are not just internal plumbing: they are a **toolbox** that agents call.
 One definition ([`packages/agent/src/tools/toolbox.ts`](packages/agent/src/tools/toolbox.ts)) feeds three consumers, so they cannot drift apart:
+Argon exposes 13 read-only graph tools via an MCP server (`apps/mcp`), enabling coding agents (Claude Code, Cursor) to reason over codebase architecture before writing code.
 
 1. **The MCP server** ([`apps/mcp`](apps/mcp)) for editors and other agents.
 2. **The LLM tool planner** inside the briefing pipeline.
@@ -305,6 +401,7 @@ docker compose up -d && pnpm seed:showcase     # FalkorDB + demo workspaces
 
 `.mcp.json` (Claude Code) or `.cursor/mcp.json` (Cursor), from the repo root:
 
+### Configure in Claude Code (`.mcp.json`) or Cursor (`.cursor/mcp.json`):
 ```json
 {
   "mcpServers": {
@@ -324,6 +421,8 @@ Then ask your agent: *"Use argon: what is the blast radius of src/billing/retry.
 `generate_briefing` additionally needs `GEMINI_API_KEY` (narration); the query tools need no LLM at all.
 Logs go to stderr; stdout carries the MCP protocol.
 The stdio server runs with your local FalkorDB credentials, so every workspace on that instance is readable through it (`list_workspaces`); do not put it behind a network transport without authentication. Set `ARGON_TOOL_SELECTION=off` to disable the LLM planner in `generate_briefing`.
+Then ask your agent:
+> *"Use argon: what is the blast radius of src/billing/retry.ts, and has it been reverted before?"*
 
 ### LLM tool selection (with a deterministic floor)
 
@@ -343,6 +442,7 @@ pnpm demo:check        # includes: verdict + trace check, and graph tools called
 ---
 
 ### Explainability extras
+## 📦 Monorepo Structure
 
 - **Click a verdict reason, see it on the graph.** Every node id a verdict reason rests on is a button; clicking it (or "Show on graph" for the whole reason) lights up those nodes and their edges on the canvas, using the same focus mechanism as the citation chips. Ids that are not drawn (for example a revert pull request) are ignored. Not drawn on the canvas today: revert PRs.
 - **Counterfactual impact.** `counterfactual_impact` answers "if I change this component, what do I disturb, nearest and most central first?" It is available to the LLM planner and over MCP, not run on every briefing.
@@ -429,6 +529,9 @@ argon/
 │   ├── web/                     # Next.js 15 brutalist UI: landing, workspace, React Flow canvas, @pierre/trees file tree, @pierre/diffs decision diffs
 │   ├── gateway/                 # Cloud Run Hono Gateway for GRAPH.RO_QUERY
 │   └── mcp/                     # MCP server (stdio): the graph tools for Claude Code / Cursor
+│   ├── web/        # Next.js 15 UI: React Flow canvas, file trees, decision diffs
+│   ├── gateway/    # Cloud Run Hono Gateway for parameterized GRAPH.RO_QUERY
+│   └── mcp/        # Model Context Protocol stdio server for Claude Code / Cursor
 ├── packages/
 │   ├── agent/                   # Briefing orchestration, narration, & citation verification
 │   ├── graph/                   # FalkorDB SDK, 10 openCypher queries, & Matryoshka embedder
@@ -436,10 +539,16 @@ argon/
 │   └── eval/                    # Revert backtest harness, dual baselines, & seed datasets
 ├── scripts/
 │   └── demo-check.ts            # Automated demo smoke test script
+│   ├── agent/      # Briefing pipeline, Gemma narration, & fail-closed verification
+│   ├── graph/      # FalkorDB SDK, 10 openCypher queries, & Matryoshka embedder
+│   ├── ingest/     # Git miner, ADR parser, & graph populator
+│   └── eval/       # Revert backtest harness, golden fixtures, & benchmarks
 ├── docs/
 │   └── BLOG-POST.md             # Publication-ready technical blog post
 ├── eval-report.json             # Programmatic benchmark comparison report
 └── docker-compose.yml           # FalkorDB local container configuration
+│   └── BLOG-POST.md # Deep dive: Temporal Graph Reasoning with FalkorDB
+└── docker-compose.yml
 ```
 
 ---
