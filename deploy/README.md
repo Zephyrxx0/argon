@@ -17,16 +17,16 @@ This guide walks you through deploying **Argon** on a single Google Cloud Platfo
 Run the following commands with `gcloud` (or configure via the GCP Console):
 
 ### A. Create the VM Instance
-We recommend an `e2-standard-2` (2 vCPUs, 8 GB RAM, 40 GB balanced persistent disk) to ensure smooth Next.js compilation, FalkorDB operation, and Git repo ingestion:
+Create an `e2-medium` (2 vCPUs burstable, 4 GB RAM, 30 GB balanced disk):
 
 ```bash
 gcloud compute instances create argon-prod \
     --project="YOUR_GCP_PROJECT_ID" \
     --zone="us-central1-a" \
-    --machine-type="e2-standard-2" \
+    --machine-type="e2-medium" \
     --image-family="ubuntu-2404-lts-amd64" \
     --image-project="ubuntu-os-cloud" \
-    --boot-disk-size="40GB" \
+    --boot-disk-size="30GB" \
     --boot-disk-type="pd-balanced" \
     --tags="http-server,https-server"
 ```
