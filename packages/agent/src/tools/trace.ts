@@ -11,6 +11,7 @@ export const QUERY_TO_TOOL_NAME: Record<QueryName, string> = {
   pathBetween: 'path_between',
   componentOverview: 'component_overview',
   revertHistory: 'revert_history',
+  counterfactualImpact: 'counterfactual_impact',
 };
 
 export type ToolTraceSource = 'pipeline' | 'llm';

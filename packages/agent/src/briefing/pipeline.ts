@@ -13,6 +13,8 @@ import type { EvidenceBundle, ResolvedScope, ToolFinding } from './types.js';
 import { validateCitationIntegrity } from '../citations/validator.js';
 import { recordOutcome } from '../memory/record-outcome.js';
 import { computeVerdict } from '../verdict/verdict.js';
+import { computeFreshness } from './freshness.js';
+import { assembleLearningPaths, type LearningPath } from './learning-path.js';
 import {
   createToolboxInvoker,
   runToolSelection,
@@ -46,6 +48,8 @@ export interface BriefingPipelineOptions {
    *   and no `customGenerator` was injected (injected generators mean "no live model").
    */
   toolSelection?: false | ToolSelectionConfig;
+  /** Injectable clock (epoch ms) for the freshness signal; defaults to Date.now. */
+  now?: () => number;
 }
 
 function buildCoreSummary(scope: ResolvedScope, bundle: EvidenceBundle): string {
@@ -141,6 +145,7 @@ export async function executeBriefingPipeline(
   //     retrieval untouched, so the briefing is never worse than without it.
   const selection = options.toolSelection;
   let toolSelection: ToolSelectionSummary;
+  let learningPaths: LearningPath[] = [];
   const disabledReason =
     selection === false
       ? 'disabled by caller'
@@ -185,6 +190,19 @@ export async function executeBriefingPipeline(
       for (const { entry, output } of result.outputs) {
         bundle.toolFindings.push(toFinding(entry, output));
         for (const id of output.evidence.primaryIds) bundle.allNodeIds.add(id);
+      }
+      // Learning paths: a path_between the planner ran becomes an annotated, ordered walk.
+      try {
+        const assembled = await assembleLearningPaths({
+          ctx: { client, embedder, now: options.now },
+          workspaceId,
+          pathCalls: result.outputs.filter((o) => o.entry.tool === 'path_between'),
+          asOf: request.asOf ?? (options.now ?? Date.now)(),
+        });
+        learningPaths = assembled.paths;
+        toolTrace.push(...assembled.trace);
+      } catch {
+        learningPaths = [];
       }
       toolSelection = {
         status: result.status,
@@ -252,6 +270,16 @@ export async function executeBriefingPipeline(
 
   const verifiedBriefing = citationResult.verifiedBriefing;
 
+  // 6b. Freshness: how old are the decisions the briefing leans on? (graph dates + the clock only)
+  const freshness = computeFreshness(
+    [
+      ...bundle.constrainingDecisions,
+      ...bundle.precedents,
+    ],
+    citationResult.verifiedNodeIds,
+    request.asOf ?? (options.now ?? Date.now)()
+  );
+
   // 7. Write-back Memory: record_outcome (D-15, D-16)
   let briefingId = '';
   if (graphClient) {
@@ -292,6 +320,8 @@ export async function executeBriefingPipeline(
     toolSelection,
     sources: bundle.sources ?? [],
     codeOwners: bundle.codeOwners ?? [],
+    freshness,
+    ...(learningPaths.length > 0 ? { learningPaths } : {}),
   };
 }
 

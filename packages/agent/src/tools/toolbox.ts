@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   BlastRadiusParamsSchema,
   ComponentOverviewParamsSchema,
+  CounterfactualImpactParamsSchema,
   PathBetweenParamsSchema,
   ResolveScopeParamsSchema,
   RevertHistoryParamsSchema,
@@ -182,6 +183,32 @@ export const ARGON_TOOLS: ArgonToolDef[] = [
     argsHint: '{"files": string[], "limit": 1-100}',
     plannerSelectable: true,
     prepare: (a) => a,
+  },
+  {
+    name: 'counterfactual_impact',
+    queryName: 'counterfactualImpact',
+    title: 'Counterfactual impact (what if I change X?)',
+    description:
+      'What-if analysis for one component: every component disturbed if it changes, ranked nearest first then by PageRank. DEPENDENT rows depend on it and break; DEPENDENCY rows are what it relies on. Each row carries the hop distance, PageRank score, the decisions in force at asOf and the CODEOWNERS owner of record. An unknown component returns no rows.',
+    input: z.object({
+      component: CounterfactualImpactParamsSchema.shape.component.describe('Name of the component that would change.'),
+      asOf: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Epoch milliseconds to evaluate decision validity at. Defaults to now.'),
+      maxDepth: CounterfactualImpactParamsSchema.shape.maxDepth,
+      limit: CounterfactualImpactParamsSchema.shape.limit,
+    }),
+    argsHint: '{"component": string, "asOf"?: epoch-ms, "maxDepth"?: 1-5, "limit"?: 1-100}',
+    plannerSelectable: true,
+    prepare: (a, ctx) => ({
+      component: a.component,
+      asOf: a.asOf ?? (ctx.now ?? Date.now)(),
+      maxDepth: a.maxDepth,
+      limit: a.limit,
+    }),
   },
 ];
 

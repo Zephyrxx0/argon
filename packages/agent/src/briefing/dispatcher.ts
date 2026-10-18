@@ -258,10 +258,18 @@ export async function dispatchRetrievalBundle(
           component: String(row.component ?? ''),
           status: String(row.status ?? 'ACCEPTED'),
           sourceUrl: row.sourceUrl ? String(row.sourceUrl) : undefined,
+          validFrom: row.validFrom != null && Number.isFinite(Number(row.validFrom)) ? Number(row.validFrom) : undefined,
+          sourceKind: row.sourceKind ? String(row.sourceKind) : undefined,
+          synthetic: row.synthetic === true ? true : undefined,
+          sourceChannel: row.sourceChannel ? String(row.sourceChannel) : undefined,
         };
         decisionById.set(dId, item);
         constrainingDecisions.push(item);
-        sourceCollector.addDecisionOrigin(dId, item.title, item.sourceUrl);
+        sourceCollector.addDecisionOrigin(dId, item.title, item.sourceUrl, {
+          sourceKind: item.sourceKind,
+          synthetic: item.synthetic,
+          channel: item.sourceChannel,
+        });
       }
       if (row.prId) {
         const prId = String(row.prId);
@@ -315,10 +323,19 @@ export async function dispatchRetrievalBundle(
           similarityScore: score,
           component: comp,
           status: decisionStatus ? String(decisionStatus) : undefined,
+          sourceKind: props.source_kind ? String(props.source_kind) : undefined,
+          synthetic: props.synthetic === true ? true : undefined,
+          sourceChannel: props.source_channel ? String(props.source_channel) : undefined,
+          validFrom:
+            props.valid_from != null && Number.isFinite(Number(props.valid_from)) ? Number(props.valid_from) : undefined,
         };
         precedentById.set(dId, item);
         precedents.push(item);
-        sourceCollector.addDecisionOrigin(dId, item.title, props.source_url);
+        sourceCollector.addDecisionOrigin(dId, item.title, props.source_url, {
+          sourceKind: item.sourceKind,
+          synthetic: item.synthetic,
+          channel: item.sourceChannel,
+        });
       }
       if (!item.component && comp) item.component = comp;
 

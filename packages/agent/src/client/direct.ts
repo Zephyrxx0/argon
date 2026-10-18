@@ -10,6 +10,7 @@ import {
   pathBetween,
   componentOverview,
   revertHistory,
+  counterfactualImpact,
 } from '@argon/graph';
 import {
   type GatewayClient,
@@ -86,6 +87,12 @@ export class DirectGraphGatewayClient implements GatewayClient {
         )) as DualPayload<QueryResultMap[K]>;
       case 'revertHistory':
         return (await revertHistory(
+          this.client,
+          workspaceId,
+          params as any
+        )) as DualPayload<QueryResultMap[K]>;
+      case 'counterfactualImpact':
+        return (await counterfactualImpact(
           this.client,
           workspaceId,
           params as any

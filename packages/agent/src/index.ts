@@ -8,6 +8,8 @@ export * from './briefing/types.js';
 export * from './briefing/resolver.js';
 export * from './briefing/dispatcher.js';
 export * from './briefing/provenance.js';
+export * from './briefing/freshness.js';
+export * from './briefing/learning-path.js';
 export * from './briefing/prompt.js';
 export * from './briefing/llm.js';
 export * from './briefing/narrator.js';

@@ -54,7 +54,8 @@ describe('createToolboxInvoker', () => {
   it('lists only planner-selectable tools (no resolve_scope) and honours an allowlist', () => {
     const client = makeClient();
     const names = createToolboxInvoker({ client }, 'ws').specs().map((s) => s.name);
-    expect(names).toHaveLength(8);
+    expect(names).toHaveLength(9);
+    expect(names).toContain('counterfactual_impact');
     expect(names).not.toContain('resolve_scope');
     expect(createToolboxInvoker({ client }, 'ws', ['path_between']).specs().map((s) => s.name)).toEqual(['path_between']);
   });

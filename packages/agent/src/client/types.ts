@@ -18,11 +18,15 @@ import type {
   ComponentOverviewResult,
   RevertHistoryParams,
   RevertHistoryResult,
+  CounterfactualImpactParams,
+  CounterfactualImpactResult,
 } from '@argon/graph';
 
 import type { ToolTraceEntry } from '../tools/trace.js';
 import type { Verdict } from '../verdict/verdict.js';
 import type { CodeOwnerItem, EvidenceSource } from '../briefing/types.js';
+import type { FreshnessSummary } from '../briefing/freshness.js';
+import type { LearningPath } from '../briefing/learning-path.js';
 
 export type QueryName =
   | 'resolveScope'
@@ -33,7 +37,8 @@ export type QueryName =
   | 'precedentSearch'
   | 'pathBetween'
   | 'componentOverview'
-  | 'revertHistory';
+  | 'revertHistory'
+  | 'counterfactualImpact';
 
 export interface QueryParamsMap {
   resolveScope: ResolveScopeParams;
@@ -45,6 +50,7 @@ export interface QueryParamsMap {
   pathBetween: PathBetweenParams;
   componentOverview: ComponentOverviewParams;
   revertHistory: RevertHistoryParams;
+  counterfactualImpact: CounterfactualImpactParams;
 }
 
 export interface QueryResultMap {
@@ -57,6 +63,7 @@ export interface QueryResultMap {
   pathBetween: PathBetweenResult;
   componentOverview: ComponentOverviewResult;
   revertHistory: RevertHistoryResult;
+  counterfactualImpact: CounterfactualImpactResult;
 }
 
 export interface BriefingRequest {
@@ -95,6 +102,10 @@ export interface BriefingResponse {
   sources?: EvidenceSource[];
   /** CODEOWNERS owners of record for the components in scope (SUCCESS only). */
   codeOwners?: CodeOwnerItem[];
+  /** How old the cited decisions are (SUCCESS only); never produced by the model. */
+  freshness?: FreshnessSummary;
+  /** Shortest dependency walks the planner asked for, annotated with decisions and owners. */
+  learningPaths?: LearningPath[];
 }
 
 export interface GatewayClient {

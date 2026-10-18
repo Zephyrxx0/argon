@@ -47,7 +47,11 @@ export function buildBriefingPrompt(task: string, bundle: EvidenceBundle): strin
           .map(
             (d) =>
               `- [NodeId: "${d.decisionId}"] ${d.title} (Component: ${d.component}, Status: ${d.status}${
-                d.sourceUrl ? `, Source: ${d.sourceUrl}` : ''
+                d.sourceKind === 'chat'
+                  ? `, Source: chat thread${d.sourceChannel ? ` in ${d.sourceChannel}` : ''}${d.synthetic ? ' (synthetic demo data)' : ''}`
+                  : ''
+              }${
+                d.sourceUrl ? `, ${d.sourceKind === 'chat' ? 'Link' : 'Source'}: ${d.sourceUrl}` : ''
               }${
                 d.pullRequestId
                   ? `, from PR ${pullRequestRef(d.pullRequestNumber, d.pullRequestId)} [NodeId: "${d.pullRequestId}"]${d.pullRequestUrl ? ` ${d.pullRequestUrl}` : ''}`
@@ -69,6 +73,10 @@ export function buildBriefingPrompt(task: string, bundle: EvidenceBundle): strin
               `- [NodeId: "${p.decisionId}"] ${p.title} (Cosine similarity: ${p.similarityScore.toFixed(2)}${
                 p.component ? `, Component: ${p.component}` : ''
               }${p.status ? `, Status: ${p.status}` : ''}${
+                p.sourceKind === 'chat'
+                  ? `, Source: chat thread${p.sourceChannel ? ` in ${p.sourceChannel}` : ''}${p.synthetic ? ' (synthetic demo data)' : ''}`
+                  : ''
+              }${
                 p.pullRequest
                   ? `, from PR ${p.pullRequest}${p.pullRequestId ? ` [NodeId: "${p.pullRequestId}"]` : ''}${p.pullRequestUrl ? ` ${p.pullRequestUrl}` : ''}`
                   : ''

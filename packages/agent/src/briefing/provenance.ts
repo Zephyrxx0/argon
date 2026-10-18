@@ -149,9 +149,30 @@ export class SourceCollector {
     this.sources.push(source);
   }
 
-  /** The decision's own origin (commit/blob URL) when it is a real link. */
-  addDecisionOrigin(decisionId: string, title: string, url: unknown): void {
+  /**
+   * The decision's own origin (commit/blob URL) when it is a real link. A chat thread is labelled
+   * as such (and as synthetic when the data is invented) instead of being guessed from its URL.
+   */
+  addDecisionOrigin(
+    decisionId: string,
+    title: string,
+    url: unknown,
+    meta: { sourceKind?: unknown; synthetic?: unknown; channel?: unknown } = {}
+  ): void {
     if (!isHttpUrl(url)) return;
+    if (meta.sourceKind === 'chat') {
+      const channel = typeof meta.channel === 'string' && meta.channel ? ` ${meta.channel}` : '';
+      const synthetic = meta.synthetic === true;
+      this.add({
+        nodeId: decisionId,
+        kind: 'chat',
+        label: `Chat thread${channel}${synthetic ? ' (synthetic)' : ''}`.slice(0, 120),
+        url,
+        relatedTo: decisionId,
+        ...(synthetic ? { synthetic: true } : {}),
+      });
+      return;
+    }
     this.add({ nodeId: decisionId, kind: sourceKindFromUrl(url), label: title, url, relatedTo: decisionId });
   }
 

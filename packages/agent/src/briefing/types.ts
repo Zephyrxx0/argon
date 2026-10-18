@@ -60,13 +60,15 @@ export interface CodeOwnerItem {
 export interface EvidenceSource {
   /** Graph node id this source describes (citable when present in the evidence). */
   nodeId: string;
-  kind: 'decision' | 'commit' | 'document' | 'pull_request' | 'issue';
+  kind: 'decision' | 'commit' | 'document' | 'chat' | 'pull_request' | 'issue';
   label: string;
   /** Absolute http(s) URL, only when the graph holds one. */
   url?: string;
   state?: string;
   /** The decision/precedent/revert node this source is the provenance of. */
   relatedTo?: string;
+  /** True when the source is invented demo data (the synthetic chat source). */
+  synthetic?: boolean;
 }
 
 export interface ConstrainingDecisionItem {
@@ -75,7 +77,14 @@ export interface ConstrainingDecisionItem {
   component: string;
   status: string;
   sourceUrl?: string;
+  /** Epoch (seconds, as stored in the graph) the decision took effect. */
   validFrom?: number;
+  /** adr | rfc | commit | pr | doc | comment | chat */
+  sourceKind?: string;
+  /** True for invented demo data (the synthetic chat source). */
+  synthetic?: boolean;
+  /** Chat decisions: the channel the thread was in. */
+  sourceChannel?: string;
   /** Pull request the decision was extracted from (graph node id and display number), if known. */
   pullRequestId?: string;
   pullRequestNumber?: number;
@@ -101,6 +110,11 @@ export interface PrecedentItem {
   summary?: string;
   /** Lifecycle status of the precedent decision in the graph (e.g. active / superseded). */
   status?: string;
+  sourceKind?: string;
+  synthetic?: boolean;
+  sourceChannel?: string;
+  /** Epoch (seconds, as stored) the precedent decision took effect. */
+  validFrom?: number;
 }
 
 export interface RevertItem {

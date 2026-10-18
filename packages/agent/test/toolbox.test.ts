@@ -22,9 +22,9 @@ const clientWith = (impl: (...a: any[]) => Promise<unknown>) =>
 
 describe('toolbox definitions', () => {
   it('has one tool per locked query, with unique snake_case names matching the trace mapping', () => {
-    expect(ARGON_TOOLS).toHaveLength(9);
-    expect(new Set(ARGON_TOOLS.map((t) => t.name)).size).toBe(9);
-    expect(new Set(ARGON_TOOLS.map((t) => t.queryName)).size).toBe(9);
+    expect(ARGON_TOOLS).toHaveLength(10);
+    expect(new Set(ARGON_TOOLS.map((t) => t.name)).size).toBe(10);
+    expect(new Set(ARGON_TOOLS.map((t) => t.queryName)).size).toBe(10);
     for (const t of ARGON_TOOLS) {
       expect(t.name).toMatch(/^[a-z]+(_[a-z]+)*$/);
       expect(QUERY_TO_TOOL_NAME[t.queryName]).toBe(t.name);
@@ -111,6 +111,38 @@ describe('executeTool', () => {
     expect(client.executeQuery).toHaveBeenCalledWith('ws', 'constrainingDecisions', { files: ['a.ts'], asOf: 4242 });
     await executeTool({ client, now: () => 4242 }, 'ws', 'constraining_decisions', { files: ['a.ts'], asOf: 7 });
     expect(client.executeQuery).toHaveBeenLastCalledWith('ws', 'constrainingDecisions', { files: ['a.ts'], asOf: 7 });
+  });
+
+  it('counterfactual_impact: defaults asOf to the injected clock and maps defaults to the query', async () => {
+    const client = clientWith(async () => payload([]));
+    await executeTool({ client, now: () => 4242 }, 'ws', 'counterfactual_impact', { component: 'billing' });
+    expect(client.executeQuery).toHaveBeenCalledWith('ws', 'counterfactualImpact', {
+      component: 'billing',
+      asOf: 4242,
+      maxDepth: 3,
+      limit: 25,
+    });
+    await executeTool({ client }, 'ws', 'counterfactual_impact', { component: 'billing', asOf: 7, maxDepth: 2, limit: 5 });
+    expect(client.executeQuery).toHaveBeenLastCalledWith('ws', 'counterfactualImpact', {
+      component: 'billing',
+      asOf: 7,
+      maxDepth: 2,
+      limit: 5,
+    });
+  });
+
+  it('counterfactual_impact rejects bad arguments without querying', async () => {
+    const client = clientWith(async () => payload([]));
+    for (const args of [{}, { component: '' }, { component: 'a', maxDepth: 9 }, { component: 'a', limit: 0 }]) {
+      const res = await executeTool({ client }, 'ws', 'counterfactual_impact', args);
+      expect(res.ok).toBe(false);
+      expect(res.error).toMatch(/Invalid arguments/);
+    }
+    expect(client.executeQuery).not.toHaveBeenCalled();
+  });
+
+  it('counterfactual_impact is offered to the planner', () => {
+    expect(getToolByName('counterfactual_impact')?.plannerSelectable).toBe(true);
   });
 
   it('embeds the text for precedent_search and never forwards the raw text as a vector', async () => {
