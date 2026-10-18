@@ -2,10 +2,11 @@
 
 import React, { useId, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Network, FolderTree, GitCompare, Plug, BookOpen } from 'lucide-react';
+import { Network, FolderTree, GitCompare, Plug, BookOpen, Bot } from 'lucide-react';
 import { clsx } from 'clsx';
 import { McpSetupPanel } from '@/components/workspace/mcp-setup-panel';
 import { GuidePanel } from '@/components/workspace/guide-panel';
+import { LlmsPanel } from '@/components/workspace/llms-panel';
 
 // The Pierre components render into shadow roots and touch the DOM on mount: client-only.
 const FileTreePanel = dynamic(
@@ -17,13 +18,14 @@ const DecisionDiffPanel = dynamic(
   { ssr: false }
 );
 
-export type InsightTab = 'graph' | 'files' | 'diff' | 'mcp' | 'guide';
+export type InsightTab = 'graph' | 'files' | 'diff' | 'llms' | 'mcp' | 'guide';
 
 const TABS: Array<{ id: InsightTab; label: string; Icon: typeof Network; align?: 'end' }> = [
   { id: 'graph', label: 'Graph', Icon: Network },
   { id: 'files', label: 'Files', Icon: FolderTree },
   { id: 'diff', label: 'Diff', Icon: GitCompare },
   // Help / meta tabs, pushed to the right edge away from the data views.
+  { id: 'llms', label: 'LLMS', Icon: Bot, align: 'end' },
   { id: 'mcp', label: 'MCP', Icon: Plug, align: 'end' },
   { id: 'guide', label: 'Guide', Icon: BookOpen, align: 'end' },
 ];
@@ -120,6 +122,17 @@ export function InsightPane({
             className={clsx('absolute inset-0', tab === 'diff' ? 'block' : 'hidden')}
           >
             <DecisionDiffPanel workspaceId={workspaceId} citedDecisionIds={citedDecisionIds} />
+          </div>
+        )}
+
+        {visited.has('llms') && (
+          <div
+            role="tabpanel"
+            id={panelId('llms')}
+            aria-labelledby={tabId('llms')}
+            className={clsx('absolute inset-0', tab === 'llms' ? 'block' : 'hidden')}
+          >
+            <LlmsPanel />
           </div>
         )}
 

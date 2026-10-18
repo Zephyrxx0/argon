@@ -147,6 +147,13 @@ docker compose -f docker-compose.prod.yml ps
 docker compose -f docker-compose.prod.yml logs -f
 ```
 
+### Seed Showcase Workspaces (Ember.js ADR Corpus)
+A fresh FalkorDB container starts with an empty database. Populate the built-in showcase workspaces (`ember-adr-showcase`, `synthetic-demo`, and `argon-dogfood`):
+
+```bash
+./scripts/seed-prod.sh
+```
+
 Caddy will automatically contact Let's Encrypt, issue a TLS certificate for `DOMAIN`, and start reverse proxying traffic. You can now visit `https://argon.yourdomain.com` in your browser!
 
 ---
